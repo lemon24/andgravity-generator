@@ -2,6 +2,7 @@ import os.path
 import click
 
 from .freeze import make_freezer
+from .core import Thingie
 
 
 @click.group()
@@ -51,9 +52,11 @@ def freeze(project, outdir, force):
             abort=True,
         )
         
+    thingie = Thingie(os.path.join(project, 'content'))
+    project_url = thingie.get_page('index').meta['project-url']
+        
     from .app import create_app
-    # FIXME: project_url
-    app = create_app(project, '')
+    app = create_app(project, project_url.rstrip('/'))
     
     app.config['FREEZER_DESTINATION'] = outdir
     app.config['FREEZER_REDIRECT_POLICY'] = 'error'

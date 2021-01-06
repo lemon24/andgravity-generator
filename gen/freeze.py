@@ -15,10 +15,7 @@ class GitHubPagesFreezer(flask_frozen.Freezer):
 
         name, ext = ntpath.splitext(path)
         if not ext:
-            if path.startswith('_feed/'):
-                path += '.xml'
-            else:
-                path += '.html'
+            path += '.html'
 
         return path
 

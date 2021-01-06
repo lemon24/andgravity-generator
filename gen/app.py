@@ -54,7 +54,7 @@ def abs_feed_url_for(id):
     return current_app.project_url + url_for('feed.feed', id=id)
 
 
-@feed_bp.route('/<id>')  
+@feed_bp.route('/<id>.xml')  
 def feed(id):
     try:
         page = get_thingie().get_page(id)
