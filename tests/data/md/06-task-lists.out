@@ -1,0 +1,4 @@
+<ul>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled/>one</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled checked/>two</li>
+</ul>

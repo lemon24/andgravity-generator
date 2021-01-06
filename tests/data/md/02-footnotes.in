@@ -1,0 +1,8 @@
+one[^1]
+
+[^1]: o-n-e
+
+two[^word][^1]
+
+[^word]: t-w-o
+

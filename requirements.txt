@@ -1,0 +1,10 @@
+flask
+click
+frozen-flask
+mistune>=2a
+python-slugify
+pyyaml
+pygments
+pytest
+feedgen
+
