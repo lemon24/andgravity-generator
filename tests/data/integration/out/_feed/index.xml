@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>https://example.com/</id>
+  <title>Site</title>
+  <updated>2022-01-01T00:00:00+00:00</updated>
+  <link href="https://example.com/" rel="alternate"/>
+  <link href="https://example.com/_feed/index.xml" rel="self"/>
+  <generator uri="https://lkiesow.github.io/python-feedgen" version="0.9.0">python-feedgen</generator>
+  <entry>
+    <id>https://example.com/two</id>
+    <title>Two</title>
+    <updated>2022-01-01T00:00:00+00:00</updated>
+    <content type="html"/>
+    <link href="https://example.com/two" rel="alternate"/>
+  </entry>
+  <entry>
+    <id>https://example.com/one</id>
+    <title>one</title>
+    <updated>2021-01-01T00:00:00+00:00</updated>
+    <content type="html">&lt;p&gt;&lt;a href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
+</content>
+    <link href="https://example.com/one" rel="alternate"/>
+  </entry>
+  <entry>
+    <id>https://example.com/three</id>
+    <title>three</title>
+    <updated>2020-01-01T00:00:00+00:00</updated>
+    <content type="html">&lt;p&gt;three&lt;/p&gt;
+</content>
+    <link href="https://example.com/three" rel="alternate"/>
+  </entry>
+</feed>

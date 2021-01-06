@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block body %}
+{{ super() }}
+
+{% for page in get_thingie().get_children(page.id, sort='updated', reverse=True) %}
+{{ url_for('.page', id=page.id) }}
+{% endfor %}
+
+{% endblock %}
