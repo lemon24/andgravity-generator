@@ -72,7 +72,8 @@ def feed(id):
 
     fg.link(href=abs_page_url_for(id), rel='alternate')
     fg.link(href=abs_feed_url_for(id), rel='self' )
-    # TODO: generator
+    # remove the default generator
+    fg.generator(generator="")
 
     # sort ascending, because feedgen reverses the entries
     children = list(get_thingie().get_children(id, sort='updated'))
