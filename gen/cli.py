@@ -73,8 +73,15 @@ def freeze(project, outdir, force):
         for url in urls:
             pass
 
-    # TODO: this should be per-freezer (it's only suitable for github pages)
+    # TODO: these should be per-freezer (it's only suitable for github pages)
+    # TODO: maybe get the freezer to not clobber them
+
     with open(os.path.join(outdir, '.nojekyll'), 'w'): pass
+
+    cname = thingie.get_page('index').meta['project-cname']
+    if cname:
+        with open(os.path.join(outdir, 'CNAME'), 'w') as f:
+            f.write(cname + '\n')
 
 
 if __name__ == '__main__':
