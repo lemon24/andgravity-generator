@@ -73,6 +73,9 @@ def freeze(project, outdir, force):
         for url in urls:
             pass
 
+    # TODO: this should be per-freezer (it's only suitable for github pages)
+    with open(os.path.join(outdir, '.nojekyll'), 'w'): pass
+
 
 if __name__ == '__main__':
     cli()    
