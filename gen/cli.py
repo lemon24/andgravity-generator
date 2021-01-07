@@ -78,7 +78,7 @@ def freeze(project, outdir, force):
 
     with open(os.path.join(outdir, '.nojekyll'), 'w'): pass
 
-    cname = thingie.get_page('index').meta['project-cname']
+    cname = thingie.get_page('index').meta.get('project-cname')
     if cname:
         with open(os.path.join(outdir, 'CNAME'), 'w') as f:
             f.write(cname + '\n')
