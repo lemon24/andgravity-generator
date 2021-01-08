@@ -28,7 +28,7 @@ def make_freezer(app):
 
     @freezer.register_generator
     def page():
-        for id in get_thingie().get_page_ids():
+        for id in get_thingie().get_page_ids(discoverable=None):
             yield '.page', {'id': id}
 
     # we deliberately do not generate anything for feed,

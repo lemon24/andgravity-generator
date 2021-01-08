@@ -7,7 +7,7 @@ class Thingie:
 
     # TODO: pluggable loader
 
-    def get_page_ids(self, hidden=False):
+    def get_page_ids(self, hidden=False, discoverable=True):
         for entry in os.scandir(self.path):
             if not entry.is_file():
                 continue
@@ -15,11 +15,16 @@ class Thingie:
             if ext != '.md':
                 continue
             
+            # TODO: this is inefficient
+            meta = self.get_page(name).meta
+
             if hidden is not None:
-                # TODO: this is inefficient
                 # TODO: hidden pages will still be generated if someone links them explicitly
-                page_hidden = self.get_page(name).meta.get('hidden', False)
-                if bool(page_hidden) is not bool(hidden):
+                if bool(meta.get('hidden', False)) is not bool(hidden):
+                    continue
+
+            if discoverable is not None:
+                if bool(meta.get('discoverable', True)) is not bool(discoverable):
                     continue
             
             yield name
@@ -33,13 +38,13 @@ class Thingie:
             content = f.read()
         return Page(id, content, metadata)
     
-    def get_children(self, id, sort='id', reverse=False, hidden=False):
+    def get_children(self, id, sort='id', reverse=False, hidden=False, discoverable=True):
 
         def generate():
             if id != 'index':
                 return
             # TODO: order by something
-            for child_id in self.get_page_ids(hidden=hidden):
+            for child_id in self.get_page_ids(hidden=hidden, discoverable=discoverable):
                 if child_id == 'index':
                     continue
                 yield self.get_page(child_id)
