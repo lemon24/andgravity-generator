@@ -235,6 +235,7 @@ def make_markdown(build_url):
             # broken at the moment
             # 'def_list',  
             mistune.directives.DirectiveToc(),
+            mistune.directives.Admonition(),
             make_wiki_plugin(build_url),
             plugin_toc_fix,
         ]
