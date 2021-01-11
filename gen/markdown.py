@@ -226,7 +226,7 @@ def plugin_toc_fix(md):
 
 def make_markdown(build_url):
     return mistune.create_markdown(
-        renderer=MyRenderer(),
+        renderer=MyRenderer(escape=False),
         plugins=[
             'strikethrough',
             'footnotes',
