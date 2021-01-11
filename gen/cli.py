@@ -1,4 +1,6 @@
 import os.path
+import webbrowser
+import threading
 import click
 
 from .freeze import make_freezer
@@ -21,12 +23,21 @@ def cli(ctx, project):
 @cli.command()
 @click.option('-h', '--host', default='localhost', help="The interface to bind to.")
 @click.option('-p', '--port', default=8080, type=int, help="The port to bind to.")
+@click.option('--open/--no-open', help="Open a browser.")
 @click.pass_obj
-def serve(project, host, port):
+def serve(project, host, port, open):
     from werkzeug.serving import run_simple
     from .app import create_app
     # TODO: threads, reload, debug
-    create_app(project, f"http://{host}:{port}").run(host, port)
+    url = f"http://{host}:{port}"
+    app = create_app(project, url)
+    open_fn = webbrowser.open if open else lambda url: None
+    timer = threading.Timer(.5, open_fn, (url,))
+    try:
+        timer.start()
+        app.run(host, port)
+    finally:
+        timer.cancel()
 
 
 @cli.command()
