@@ -11,6 +11,9 @@ ln
 ```python linenos lineno-start=2
 lns
 ```
+```python lineno-start=2
+lns2
+```
 ```python emphasize-lines=1,3-
 one
 two

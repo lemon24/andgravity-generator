@@ -114,6 +114,7 @@ def parse_options(rest: str, code: str) -> dict:
 
     if 'lineno-start' in options:
         rv['linenostart'] = int(options.pop('lineno-start'))
+        rv.setdefault('linenos', True)
 
     # disable caption for now;
     # we don't know how to parse quoted literals (so it must be a single word),
