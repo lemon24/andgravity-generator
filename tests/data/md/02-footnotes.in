@@ -5,4 +5,3 @@ one[^1]
 two[^word][^1]
 
 [^word]: t-w-o
-

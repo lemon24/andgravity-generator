@@ -1,10 +1,11 @@
 import os.path
-import webbrowser
 import threading
+import webbrowser
+
 import click
 
-from .freeze import make_freezer
 from .core import Thingie
+from .freeze import make_freezer
 
 
 @click.group()
@@ -28,11 +29,12 @@ def cli(ctx, project):
 def serve(project, host, port, open):
     from werkzeug.serving import run_simple
     from .app import create_app
+
     # TODO: threads, reload, debug
     url = f"http://{host}:{port}"
     app = create_app(project, url)
     open_fn = webbrowser.open if open else lambda url: None
-    timer = threading.Timer(.5, open_fn, (url,))
+    timer = threading.Timer(0.5, open_fn, (url,))
     try:
         timer.start()
         app.run(host, port)
@@ -46,10 +48,10 @@ def serve(project, host, port, open):
     type=click.Path(file_okay=False, resolve_path=True),
 )
 @click.option(
-    '-f', '--force/--no-force',
-    help=
-        "Overwrite any previously generated files. "
-        "WARNING: All other files will be deleted.",
+    '-f',
+    '--force/--no-force',
+    help="Overwrite any previously generated files. "
+    "WARNING: All other files will be deleted.",
 )
 @click.pass_obj
 def freeze(project, outdir, force):
@@ -58,15 +60,15 @@ def freeze(project, outdir, force):
             f"{click.style('WARNING', fg='red', bold=True)}: {outdir} exists. \n"
             "Previously generated files will be overwritten. \n"
             "All other files will be deleted.\n"
-            "Proceed?"
-            ,
+            "Proceed?",
             abort=True,
         )
-        
+
     thingie = Thingie(os.path.join(project, 'content'))
     project_url = thingie.get_page('index').meta['project-url']
-        
+
     from .app import create_app
+
     app = create_app(project, project_url.rstrip('/'))
 
     app.config['FREEZER_DESTINATION'] = outdir
@@ -74,7 +76,7 @@ def freeze(project, outdir, force):
     app.config['FREEZER_DESTINATION_IGNORE'] = ['.git*']
 
     freezer = make_freezer(app)
-    
+
     progressbar = click.progressbar(
         freezer.freeze_yield(),
         item_show_func=lambda p: p.url if p else 'Done!',
@@ -87,7 +89,8 @@ def freeze(project, outdir, force):
     # TODO: these should be per-freezer (it's only suitable for github pages)
     # TODO: maybe get the freezer to not clobber them
 
-    with open(os.path.join(outdir, '.nojekyll'), 'w'): pass
+    with open(os.path.join(outdir, '.nojekyll'), 'w'):
+        pass
 
     cname = thingie.get_page('index').meta.get('project-cname')
     if cname:
@@ -96,4 +99,4 @@ def freeze(project, outdir, force):
 
 
 if __name__ == '__main__':
-    cli()    
+    cli()

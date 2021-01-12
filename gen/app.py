@@ -1,12 +1,19 @@
 import os.path
 
-from flask import Flask, Blueprint, render_template, current_app, g, url_for, abort, Response
+import feedgen.feed
 import jinja2
 import markupsafe
-import feedgen.feed
+from flask import abort
+from flask import Blueprint
+from flask import current_app
+from flask import Flask
+from flask import g
+from flask import render_template
+from flask import Response
+from flask import url_for
 
-from .markdown import make_markdown
 from .core import Thingie
+from .markdown import make_markdown
 
 
 def build_url(id):
@@ -14,6 +21,7 @@ def build_url(id):
     # TODO: raise a nicer exception
     page = get_thingie().get_page(id)
     return url_for("main.page", id=id)
+
 
 def get_thingie():
     if hasattr(g, 'thingie'):
@@ -25,13 +33,14 @@ def get_thingie():
 
 main_bp = Blueprint('main', __name__)
 
+
 @main_bp.app_template_filter('markdown')
 def markdown_filter(md):
     return markupsafe.Markup(current_app.markdown(md))
 
 
 @main_bp.route('/', defaults={'id': 'index'})
-@main_bp.route('/<id>')  
+@main_bp.route('/<id>')
 def page(id):
     try:
         page = get_thingie().get_page(id)
@@ -47,31 +56,33 @@ def page(id):
 
 feed_bp = Blueprint('feed', __name__)
 
+
 def abs_page_url_for(id):
     return current_app.project_url + url_for('main.page', id=id)
-    
+
+
 def abs_feed_url_for(id):
     return current_app.project_url + url_for('feed.feed', id=id)
 
 
-@feed_bp.route('/<id>.xml')  
+@feed_bp.route('/<id>.xml')
 def feed(id):
     try:
         page = get_thingie().get_page(id)
     # TODO: be more precise in what we're catching
     except FileNotFoundError:
         return abort(404)
-    
+
     fg = feedgen.feed.FeedGenerator()
     fg.id(abs_page_url_for(id))  # required
-    
+
     feed_title = page.title
     if id != 'index':
         feed_title = get_thingie().get_page('index').title + ': ' + feed_title
     fg.title(feed_title)  # required
 
     fg.link(href=abs_page_url_for(id), rel='alternate')
-    fg.link(href=abs_feed_url_for(id), rel='self' )
+    fg.link(href=abs_feed_url_for(id), rel='self')
     # remove the default generator
     fg.generator(generator="")
 
@@ -89,23 +100,23 @@ def feed(id):
         fe.id(abs_page_url_for(child.id))  # required
         fe.title(child.title)  # required
         fe.link(href=abs_page_url_for(child.id))
-        
+
         # TODO: published
         fe.updated(child.meta['updated'])  # required
-        
+
         # TODO: summary feature
         fe.content(content=current_app.markdown(child.content), type='html')
-        
+
     return Response(
-        fg.atom_str(pretty=True), 
+        fg.atom_str(pretty=True),
         # should be application/atom+xml, but we get warnings when freezing
-        mimetype='application/xml', 
+        mimetype='application/xml',
     )
-        
-        
+
+
 def create_app(project_root, project_url):
     app = Flask(
-        __name__, 
+        __name__,
         template_folder=os.path.join(project_root, 'templates'),
         static_url_path='/_static',
         static_folder=os.path.join(project_root, 'static'),
@@ -118,4 +129,3 @@ def create_app(project_root, project_url):
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
     return app
-

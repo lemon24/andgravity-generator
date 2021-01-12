@@ -1,6 +1,7 @@
 import os.path
 from dataclasses import dataclass
 
+
 @dataclass
 class Thingie:
     path: str
@@ -14,7 +15,7 @@ class Thingie:
             name, ext = os.path.splitext(entry.name)
             if ext != '.md':
                 continue
-            
+
             # TODO: this is inefficient
             meta = self.get_page(name).meta
 
@@ -26,7 +27,7 @@ class Thingie:
             if discoverable is not None:
                 if bool(meta.get('discoverable', True)) is not bool(discoverable):
                     continue
-            
+
             yield name
 
     def page_exists(self, id):
@@ -37,9 +38,10 @@ class Thingie:
             metadata = load_metadata(f) or {}
             content = f.read()
         return Page(id, content, metadata)
-    
-    def get_children(self, id, sort='id', reverse=False, hidden=False, discoverable=True):
 
+    def get_children(
+        self, id, sort='id', reverse=False, hidden=False, discoverable=True
+    ):
         def generate():
             if id != 'index':
                 return
@@ -48,25 +50,25 @@ class Thingie:
                 if child_id == 'index':
                     continue
                 yield self.get_page(child_id)
-            
+
         rv = generate()
         if sort == 'id':
             rv = sorted(rv, key=lambda p: p.id, reverse=reverse)
         elif sort == 'updated':
             rv = (p for p in rv if 'updated' in p.meta)
-            rv = sorted(rv, key=lambda p: p.meta['updated'], reverse=reverse) 
+            rv = sorted(rv, key=lambda p: p.meta['updated'], reverse=reverse)
         else:
             raise ValueError(f"unknown sort: {sort!r}")
 
         return iter(rv)
-    
+
 
 @dataclass
 class Page:
     id: str
     content: str
     meta: dict
-    
+
     # TODO: eager loading
     # TODO: required attributes
 
@@ -76,6 +78,7 @@ class Page:
 
 
 import yaml
+
 
 def load_metadata(file):
     initial_offset = file.tell()
@@ -100,6 +103,3 @@ def load_metadata(file):
     except:
         file.seek(initial_offset)
         raise
-
-
-

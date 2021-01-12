@@ -1,8 +1,8 @@
 import os.path
 from glob import glob
 
-import pytest
 import mistune
+import pytest
 
 from gen.markdown import make_markdown
 
@@ -26,5 +26,3 @@ def md_html(request):
 def test_parts(md_html):
     md, html = md_html
     assert make_markdown(str.upper)(md) == html
-    
-    

@@ -22,5 +22,3 @@ def test_load_metadata():
     with pytest.raises(yaml.YAMLError):
         load_metadata(f)
     assert f.read() == "---\n[one\n---\ntwo\n"
-    
-    
