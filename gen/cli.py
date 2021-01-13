@@ -71,6 +71,8 @@ def freeze(project, outdir, force):
 
     app = create_app(project, project_url.rstrip('/'))
 
+    app.config['GEN_FREEZING'] = True
+
     app.config['FREEZER_DESTINATION'] = outdir
     app.config['FREEZER_REDIRECT_POLICY'] = 'error'
     app.config['FREEZER_DESTINATION_IGNORE'] = ['.git*']
