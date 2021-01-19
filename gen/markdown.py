@@ -9,7 +9,7 @@ from pygments.lexers import guess_lexer
 from slugify import slugify
 
 
-WIKI_PATTERN = r'\[\[' r'([\s\S]+?\|?[\s\S]+?)' r'\]\](?!\])'  # [[  # link|title  # ]]
+WIKI_PATTERN = r'\[\[' r'([\s\S]+?\|?[\s\S]+?)' r'\]\](?!\])'  # [[ link|title ]]
 
 
 def parse_wiki(self, m, state):
@@ -231,6 +231,23 @@ def plugin_toc_fix(md):
         md.renderer.register('theading', render_html_theading)
 
 
+def render_html_footnote_item(text, key, index):
+    i = str(index)
+    back = ' <a href="#fnref-' + i + '" class="footnote"><sup>[return]</sup></a>'
+
+    text = text.rstrip()
+    if text.endswith('</p>'):
+        text = text[:-4] + back + '</p>'
+    else:
+        text = text + back
+    return '<li id="fn-' + i + '">' + text + '</li>\n'
+
+
+def plugin_footnotes_fix(md):
+    if md.renderer.NAME == 'html':
+        md.renderer.register('footnote_item', render_html_footnote_item)
+
+
 def make_markdown(build_url):
     return mistune.create_markdown(
         renderer=MyRenderer(escape=False),
@@ -245,5 +262,6 @@ def make_markdown(build_url):
             mistune.directives.Admonition(),
             make_wiki_plugin(build_url),
             plugin_toc_fix,
+            plugin_footnotes_fix,
         ],
     )
