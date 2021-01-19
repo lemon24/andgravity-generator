@@ -1,6 +1,8 @@
 import ntpath
+import os.path
 
 import flask_frozen
+from flask import current_app
 
 from .app import get_thingie
 
@@ -34,5 +36,7 @@ def make_freezer(app):
     # we deliberately do not generate anything for feed,
     # because we only want to generate the feeds linked from
     # templates; later, we can use a has-feed page metadata
+
+    # same for file, at least initially
 
     return freezer

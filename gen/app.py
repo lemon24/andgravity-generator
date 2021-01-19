@@ -1,4 +1,6 @@
+import ntpath
 import os.path
+from urllib.parse import urlparse
 
 import feedgen.feed
 import jinja2
@@ -9,7 +11,9 @@ from flask import current_app
 from flask import Flask
 from flask import g
 from flask import render_template
+from flask import request
 from flask import Response
+from flask import send_from_directory
 from flask import url_for
 
 from .core import Thingie
@@ -114,6 +118,37 @@ def feed(id):
     )
 
 
+file_bp = Blueprint('file', __name__)
+
+
+@file_bp.route('/<id>/<name>')
+def file(id, name):
+    # TODO: Thingie should tell us what the path to files is
+    return send_from_directory(
+        os.path.join(current_app.project_root, 'files'),
+        os.path.join(id, name),
+    )
+
+
+def build_file_url(url):
+    url_parsed = urlparse(url)
+    if url_parsed.scheme != 'attachment':
+        return None
+
+    head, tail = ntpath.split(url_parsed.path)
+    if head:
+        raise ValueError(f"attachment: supports only plain filenames, got {url!r}")
+
+    id = request.view_args['id']
+    # check for existence
+    # TODO: raise a nicer exception
+    page = get_thingie().get_page(id)
+
+    # TODO: maybe raise if the file doesn't exist?
+    # the freezer fails for 404s, so it's not urgent
+    return url_for("file.file", id=id, name=tail)
+
+
 def create_app(project_root, project_url):
     app = Flask(
         __name__,
@@ -125,7 +160,8 @@ def create_app(project_root, project_url):
     app.project_url = project_url
     app.jinja_env.undefined = jinja2.StrictUndefined
     app.add_template_global(get_thingie)
-    app.markdown = make_markdown(build_url)
+    app.markdown = make_markdown(build_url, build_file_url)
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
+    app.register_blueprint(file_bp, url_prefix='/_file')
     return app

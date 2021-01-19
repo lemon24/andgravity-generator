@@ -135,8 +135,9 @@ def parse_options(rest: str, code: str) -> dict:
 
 
 class MyRenderer(mistune.HTMLRenderer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, url_rewriters=(), **kwargs):
         super().__init__(*args, **kwargs)
+        self._url_rewriters = list(url_rewriters)
 
     def block_code(self, code, info=None):
         if info is not None:
@@ -197,6 +198,19 @@ class MyRenderer(mistune.HTMLRenderer):
     def table(self, text):
         return '<table class="table">\n' + text + '</table>\n'
 
+    def _rewrite_url(self, url):
+        for rewriter in self._url_rewriters:
+            url = rewriter(url) or url
+        return url
+
+    def link(self, link, text=None, title=None):
+        link = self._rewrite_url(link)
+        return super().link(link, text, title)
+
+    def image(self, src, alt="", title=None):
+        src = self._rewrite_url(src)
+        return super().image(src, alt, title)
+
 
 def record_toc_heading(text, level, state):
     existing_tids = set(t[0] for t in state['toc_headings'])
@@ -248,9 +262,9 @@ def plugin_footnotes_fix(md):
         md.renderer.register('footnote_item', render_html_footnote_item)
 
 
-def make_markdown(build_url):
+def make_markdown(build_url, rewrite_url):
     return mistune.create_markdown(
-        renderer=MyRenderer(escape=False),
+        renderer=MyRenderer(escape=False, url_rewriters=[rewrite_url]),
         plugins=[
             'strikethrough',
             'footnotes',
