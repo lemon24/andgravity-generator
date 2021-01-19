@@ -23,6 +23,12 @@ def md_html(request):
         return mdf.read(), htmlf.read()
 
 
+def build_file_url(url):
+    if url.startswith('attachment:'):
+        return url.upper()
+    return None
+
+
 def test_parts(md_html):
     md, html = md_html
-    assert make_markdown(str.upper)(md) == html
+    assert make_markdown(str.upper, build_file_url)(md) == html
