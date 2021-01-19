@@ -5,6 +5,6 @@ mistune>=2a
 python-slugify
 pyyaml
 pygments
-pytest
 feedgen
+pytest
 pre-commit
