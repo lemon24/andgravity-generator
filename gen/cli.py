@@ -1,4 +1,5 @@
 import os.path
+import subprocess
 import threading
 import webbrowser
 
@@ -53,16 +54,31 @@ def serve(project, host, port, open):
     help="Overwrite any previously generated files. "
     "WARNING: All other files will be deleted.",
 )
+@click.option(
+    '--deploy/--no-deploy',
+    default=None,
+    help="If OUTDIR is a git repo, add all changed, commit, and push.",
+)
 @click.pass_obj
-def freeze(project, outdir, force):
-    if os.path.exists(outdir) and not force:
-        click.confirm(
-            f"{click.style('WARNING', fg='red', bold=True)}: {outdir} exists. \n"
-            "Previously generated files will be overwritten. \n"
-            "All other files will be deleted.\n"
-            "Proceed?",
-            abort=True,
-        )
+def freeze(project, outdir, force, deploy):
+    stdout_isatty = click.get_text_stream('stdout').isatty()
+    confirm_overwrite = os.path.exists(outdir) and not force
+
+    # TODO: all conversations should be on stderr
+
+    if confirm_overwrite:
+        if stdout_isatty:
+            click.confirm(
+                f"{click.style('WARNING', fg='red', bold=True)}: {outdir} exists. \n"
+                "Previously generated files will be overwritten. \n"
+                "All other files will be deleted.\n"
+                "Proceed?",
+                abort=True,
+                err=True,
+            )
+        else:
+            click.echo(f"{outdir} exists, but --force not passed.")
+            raise click.Abort()
 
     thingie = Thingie(os.path.join(project, 'content'))
     project_url = thingie.get_page('index').meta['project-url']
@@ -76,6 +92,8 @@ def freeze(project, outdir, force):
     app.config['FREEZER_DESTINATION'] = outdir
     app.config['FREEZER_REDIRECT_POLICY'] = 'error'
     app.config['FREEZER_DESTINATION_IGNORE'] = ['.git*']
+
+    # TODO: check for uncommited changes in outdir; also, probably pull
 
     freezer = make_freezer(app)
 
@@ -98,6 +116,21 @@ def freeze(project, outdir, force):
     if cname:
         with open(os.path.join(outdir, 'CNAME'), 'w') as f:
             f.write(cname + '\n')
+
+    know_how_to_deploy = os.path.isdir(os.path.join(outdir, '.git'))
+    if not know_how_to_deploy:
+        click.echo("OUTDIR not a git repo, nothing to deploy.")
+        return
+
+    if deploy is None:
+        if not stdout_isatty:
+            click.echo("--deploy not passed, not deploying.")
+            return
+        deploy = click.confirm("Deploy?")
+    if deploy:
+        subprocess.run(['git', '-C', outdir, 'add', '--all'])
+        subprocess.run(['git', '-C', outdir, 'commit', '-m', "deploy"])
+        subprocess.run(['git', '-C', outdir, 'push'])
 
 
 if __name__ == '__main__':
