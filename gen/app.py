@@ -2,6 +2,7 @@ import ntpath
 import os.path
 from urllib.parse import urlparse
 
+import feedgen.ext.base
 import feedgen.feed
 import jinja2
 import markupsafe
@@ -75,6 +76,12 @@ def abs_feed_url_for(id):
     return current_app.project_url + url_for('feed.feed', id=id)
 
 
+class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
+    def extend_atom(self, entry):
+        entry.base = entry.find("./link[@rel='alternate']").attrib['href']
+        return entry
+
+
 @feed_bp.route('/<id>.xml')
 def feed(id):
     try:
@@ -107,6 +114,8 @@ def feed(id):
 
     for child in children:
         fe = fg.add_entry()
+        fe.register_extension('atomxmlbase', AtomXMLBaseExt, atom=True, rss=False)
+
         fe.id(abs_page_url_for(child.id))  # required
         fe.title(child.title)  # required
         fe.link(href=abs_page_url_for(child.id))
