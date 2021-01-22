@@ -39,8 +39,14 @@ main_bp = Blueprint('main', __name__)
 
 
 @main_bp.app_template_filter('markdown')
-def markdown_filter(md):
-    return markupsafe.Markup(current_app.markdown(md))
+def markdown_filter(md, id=None):
+    def make_rv():
+        return markupsafe.Markup(current_app.markdown(md))
+
+    if id is None:
+        return make_rv()
+    with current_app.test_request_context(url_for('main.page', id=id)):
+        return make_rv()
 
 
 @main_bp.route('/', defaults={'id': 'index'})
@@ -109,7 +115,7 @@ def feed(id):
         fe.updated(child.meta['updated'])  # required
 
         # TODO: summary feature
-        fe.content(content=current_app.markdown(child.content), type='html')
+        fe.content(content=markdown_filter(child.content, id=child.id), type='html')
 
     return Response(
         fg.atom_str(pretty=True),
