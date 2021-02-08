@@ -136,12 +136,12 @@ def feed(id):
 file_bp = Blueprint('file', __name__)
 
 
-@file_bp.route('/<id>/<name>')
-def file(id, name):
+@file_bp.route('/<id>/<path:path>')
+def file(id, path):
     # TODO: Thingie should tell us what the path to files is
     return send_from_directory(
         os.path.join(current_app.project_root, 'files'),
-        os.path.join(id, name),
+        os.path.join(id, path),
     )
 
 
@@ -150,9 +150,10 @@ def build_file_url(url):
     if url_parsed.scheme != 'attachment':
         return None
 
-    head, tail = ntpath.split(url_parsed.path)
-    if head:
-        raise ValueError(f"attachment: supports only plain filenames, got {url!r}")
+    if url_parsed.hostname:
+        raise ValueError(f"attachment: does not support host yet, got {url!r}")
+
+    path = url_parsed.path.lstrip('/')
 
     id = request.view_args['id']
     # check for existence
@@ -161,7 +162,7 @@ def build_file_url(url):
 
     # TODO: maybe raise if the file doesn't exist?
     # the freezer fails for 404s, so it's not urgent
-    return url_for("file.file", id=id, name=tail)
+    return url_for("file.file", id=id, path=path)
 
 
 def create_app(project_root, project_url):
