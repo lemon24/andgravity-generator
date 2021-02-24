@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <id>https://example.com/</id>
-  <title>Site: #second-tag #third-tag</title>
+  <title>Site #second-tag #third-tag</title>
   <updated>2022-01-01T00:00:00+00:00</updated>
   <link href="https://example.com/" rel="alternate"/>
   <link href="https://example.com/_feed/index.xml" rel="self"/>

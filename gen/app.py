@@ -92,8 +92,6 @@ def feed(id):
 def tags_feed(id, tags):
     # TODO: check tags exist in thingie
     # TODO: check tags are in canonical order
-
-    # FIXME: feed title
     return make_feed_response(id, tags)
 
 
@@ -122,7 +120,7 @@ def make_feed(thingie, id, tags=None):
     if id != 'index':
         feed_title = thingie.get_page('index').title + ': ' + feed_title
     if tags:
-        feed_title += f": {' '.join(f'#{t}' for t in tags)}"
+        feed_title += f" {' '.join(f'#{t}' for t in tags)}"
     fg.title(feed_title)  # required
 
     fg.link(href=abs_page_url_for(id), rel='alternate')
