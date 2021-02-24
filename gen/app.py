@@ -74,8 +74,12 @@ def abs_page_url_for(id):
     return current_app.project_url + url_for('main.page', id=id)
 
 
-def abs_feed_url_for(id):
-    return current_app.project_url + url_for('feed.feed', id=id)
+def abs_feed_url_for(id, tags=None):
+    if not tags:
+        url = url_for('feed.feed', id=id)
+    else:
+        url = url_for('feed.tags_feed', id=id, tags=tags)
+    return current_app.project_url + url
 
 
 class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
@@ -115,6 +119,7 @@ def make_feed(thingie, id, tags=None):
     page = thingie.get_page(id)
 
     fg = feedgen.feed.FeedGenerator()
+    # TODO: link to tag page once we have one
     fg.id(abs_page_url_for(id))  # required
 
     feed_title = page.title
@@ -125,7 +130,8 @@ def make_feed(thingie, id, tags=None):
     fg.title(feed_title)  # required
 
     fg.link(href=abs_page_url_for(id), rel='alternate')
-    fg.link(href=abs_feed_url_for(id), rel='self')
+    # TODO: link to tag page once we have one
+    fg.link(href=abs_feed_url_for(id, tags), rel='self')
     # remove the default generator
     fg.generator(generator="")
 

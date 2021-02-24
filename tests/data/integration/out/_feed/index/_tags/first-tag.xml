@@ -4,7 +4,7 @@
   <title>Site #first-tag</title>
   <updated>2023-01-01T00:00:00+00:00</updated>
   <link href="https://example.com/" rel="alternate"/>
-  <link href="https://example.com/_feed/index.xml" rel="self"/>
+  <link href="https://example.com/_feed/index/_tags/first-tag.xml" rel="self"/>
   <entry xml:base="https://example.com/two">
     <id>https://example.com/two</id>
     <title>Two</title>
