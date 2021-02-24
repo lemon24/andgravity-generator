@@ -84,18 +84,33 @@ class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
 
 @feed_bp.route('/<id>.xml')
 def feed(id):
+    return make_feed_response(id)
+
+
+def make_feed_response(*args, **kwargs):
     try:
-        page = get_thingie().get_page(id)
+        fg = make_feed(get_thingie(), *args, **kwargs)
     # TODO: be more precise in what we're catching
+    # (both exc type, and that it's for id and not other node)
     except FileNotFoundError:
         return abort(404)
+
+    return Response(
+        fg.atom_str(pretty=True),
+        # should be application/atom+xml, but we get warnings when freezing
+        mimetype='application/xml',
+    )
+
+
+def make_feed(thingie, id):
+    page = thingie.get_page(id)
 
     fg = feedgen.feed.FeedGenerator()
     fg.id(abs_page_url_for(id))  # required
 
     feed_title = page.title
     if id != 'index':
-        feed_title = get_thingie().get_page('index').title + ': ' + feed_title
+        feed_title = thingie.get_page('index').title + ': ' + feed_title
     fg.title(feed_title)  # required
 
     fg.link(href=abs_page_url_for(id), rel='alternate')
@@ -104,7 +119,7 @@ def feed(id):
     fg.generator(generator="")
 
     # sort ascending, because feedgen reverses the entries
-    children = list(get_thingie().get_children(id, sort='updated'))
+    children = list(thingie.get_children(id, sort='updated'))
 
     if not children:
         feed_updated = '1970-01-01T00:00:00Z'
@@ -126,11 +141,7 @@ def feed(id):
         # TODO: summary feature
         fe.content(content=markdown_filter(child.content, id=child.id), type='html')
 
-    return Response(
-        fg.atom_str(pretty=True),
-        # should be application/atom+xml, but we get warnings when freezing
-        mimetype='application/xml',
-    )
+    return fg
 
 
 file_bp = Blueprint('file', __name__)
