@@ -16,6 +16,7 @@ from flask import request
 from flask import Response
 from flask import send_from_directory
 from flask import url_for
+from werkzeug.routing import BaseConverter
 
 from .core import Thingie
 from .markdown import make_markdown
@@ -87,6 +88,15 @@ def feed(id):
     return make_feed_response(id)
 
 
+@feed_bp.route('/<id>/_tags/<list:tags>.xml')
+def tags_feed(id, tags):
+    # TODO: check tags exist in thingie
+    # TODO: check tags are in canonical order
+
+    # FIXME: feed title
+    return make_feed_response(id, tags)
+
+
 def make_feed_response(*args, **kwargs):
     try:
         fg = make_feed(get_thingie(), *args, **kwargs)
@@ -102,7 +112,7 @@ def make_feed_response(*args, **kwargs):
     )
 
 
-def make_feed(thingie, id):
+def make_feed(thingie, id, tags=None):
     page = thingie.get_page(id)
 
     fg = feedgen.feed.FeedGenerator()
@@ -111,6 +121,8 @@ def make_feed(thingie, id):
     feed_title = page.title
     if id != 'index':
         feed_title = thingie.get_page('index').title + ': ' + feed_title
+    if tags:
+        feed_title += f": {' '.join(f'#{t}' for t in tags)}"
     fg.title(feed_title)  # required
 
     fg.link(href=abs_page_url_for(id), rel='alternate')
@@ -119,7 +131,7 @@ def make_feed(thingie, id):
     fg.generator(generator="")
 
     # sort ascending, because feedgen reverses the entries
-    children = list(thingie.get_children(id, sort='updated'))
+    children = list(thingie.get_children(id, sort='updated', tags=tags))
 
     if not children:
         feed_updated = '1970-01-01T00:00:00Z'
@@ -176,6 +188,15 @@ def build_file_url(url):
     return url_for("file.file", id=id, path=path)
 
 
+class ListConverter(BaseConverter):
+    def to_python(self, value):
+        return value.split(',')
+
+    def to_url(self, values):
+        to_url = super().to_url
+        return ','.join(to_url(value) for value in values)
+
+
 def create_app(project_root, project_url):
     app = Flask(
         __name__,
@@ -186,6 +207,7 @@ def create_app(project_root, project_url):
     app.project_root = project_root
     app.project_url = project_url
     app.jinja_env.undefined = jinja2.StrictUndefined
+    app.url_map.converters['list'] = ListConverter
     app.add_template_global(get_thingie)
     app.markdown = make_markdown(build_url, build_file_url)
     app.register_blueprint(main_bp)

@@ -21,7 +21,9 @@ def test_freeze(tmp_path):
 
     runner = CliRunner()
     result = runner.invoke(
-        cli, ['--project', str(input_dir), 'freeze', str(output_dir)]
+        cli,
+        ['--project', str(input_dir), 'freeze', str(output_dir)],
+        catch_exceptions=False,
     )
     assert result.exit_code == 0
 

@@ -8,7 +8,7 @@ class Thingie:
 
     # TODO: pluggable loader
 
-    def get_page_ids(self, hidden=False, discoverable=True):
+    def get_page_ids(self, hidden=False, discoverable=True, tags=None):
         for entry in os.scandir(self.path):
             if not entry.is_file():
                 continue
@@ -17,7 +17,8 @@ class Thingie:
                 continue
 
             # TODO: this is inefficient
-            meta = self.get_page(name).meta
+            page = self.get_page(name)
+            meta = page.meta
 
             if hidden is not None:
                 # TODO: hidden pages will still be generated if someone links them explicitly
@@ -26,6 +27,10 @@ class Thingie:
 
             if discoverable is not None:
                 if bool(meta.get('discoverable', True)) is not bool(discoverable):
+                    continue
+
+            if tags is not None:
+                if not any(tag in page.tags for tag in tags):
                     continue
 
             yield name
@@ -40,13 +45,14 @@ class Thingie:
         return Page(id, content, metadata)
 
     def get_children(
-        self, id, sort='id', reverse=False, hidden=False, discoverable=True
+        self, id, sort='id', reverse=False, hidden=False, discoverable=True, tags=None
     ):
         def generate():
             if id != 'index':
                 return
             # TODO: order by something
-            for child_id in self.get_page_ids(hidden=hidden, discoverable=discoverable):
+            ids = self.get_page_ids(hidden=hidden, discoverable=discoverable, tags=tags)
+            for child_id in ids:
                 if child_id == 'index':
                     continue
                 yield self.get_page(child_id)
@@ -75,6 +81,33 @@ class Page:
     @property
     def title(self):
         return self.meta.get('title', self.id)
+
+    @property
+    def tags(self):
+        tags = self.meta.get('tags') or []
+        error = ValueError(f"bad tags for {self.id}: {tags!r}")
+        if not isinstance(tags, list):
+            raise error
+        for tag in tags:
+            if not isinstance(tag, str):
+                raise error
+        return tags
+
+    @property
+    def tags_feed(self):
+        tags_feed = self.meta.get('tags-feed') or []
+        error = ValueError(f"bad tags-feed for {self.id}: {tags_feed!r}")
+        if not isinstance(tags_feed, list):
+            raise error
+        for tags in tags_feed:
+            if not isinstance(tags, list):
+                raise error
+            if not tags:
+                raise error
+            for tag in tags:
+                if not isinstance(tag, str):
+                    raise error
+        return tags_feed
 
 
 import yaml

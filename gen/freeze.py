@@ -39,4 +39,13 @@ def make_freezer(app):
 
     # same for file, at least initially
 
+    # the tags feed(s) happen on-demand, though
+
+    @freezer.register_generator
+    def tags_feed():
+        for id in get_thingie().get_page_ids(discoverable=None):
+            page = get_thingie().get_page(id)
+            for tags in page.tags_feed:
+                yield 'feed.tags_feed', {'id': id, 'tags': tags}
+
     return freezer
