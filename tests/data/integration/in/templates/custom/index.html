@@ -3,7 +3,7 @@
 {% block body %}
 {{ super() }}
 
-{% for page in get_thingie().get_children(page.id, sort='updated', reverse=True) %}
+{% for page in get_thingie().get_children(page.id, sort='published', reverse=True) %}
 {{ url_for('.page', id=page.id) }}
 {% endfor %}
 

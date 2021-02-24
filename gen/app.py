@@ -1,5 +1,6 @@
 import ntpath
 import os.path
+from itertools import chain
 from urllib.parse import urlparse
 
 import feedgen.ext.base
@@ -129,12 +130,20 @@ def make_feed(thingie, id, tags=None):
     fg.generator(generator="")
 
     # sort ascending, because feedgen reverses the entries
-    children = list(thingie.get_children(id, sort='updated', tags=tags))
+    children = list(thingie.get_children(id, sort='published', tags=tags))
 
     if not children:
         feed_updated = '1970-01-01T00:00:00Z'
     else:
-        feed_updated = children[-1].meta['updated']
+        feed_updated = max(
+            date
+            for child in children
+            for date in (
+                child.meta.get('updated', child.meta['published']),
+                child.meta['published'],
+            )
+        )
+
     fg.updated(feed_updated)  # required
 
     for child in children:
@@ -145,8 +154,8 @@ def make_feed(thingie, id, tags=None):
         fe.title(child.title)  # required
         fe.link(href=abs_page_url_for(child.id))
 
-        # TODO: published
-        fe.updated(child.meta['updated'])  # required
+        fe.updated(child.meta.get('updated', child.meta['published']))  # required
+        fe.published(child.meta['published'])
 
         # TODO: summary feature
         fe.content(content=markdown_filter(child.content, id=child.id), type='html')

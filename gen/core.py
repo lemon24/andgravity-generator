@@ -60,9 +60,9 @@ class Thingie:
         rv = generate()
         if sort == 'id':
             rv = sorted(rv, key=lambda p: p.id, reverse=reverse)
-        elif sort == 'updated':
-            rv = (p for p in rv if 'updated' in p.meta)
-            rv = sorted(rv, key=lambda p: p.meta['updated'], reverse=reverse)
+        elif sort == 'published':
+            rv = (p for p in rv if 'published' in p.meta)
+            rv = sorted(rv, key=lambda p: p.meta['published'], reverse=reverse)
         else:
             raise ValueError(f"unknown sort: {sort!r}")
 

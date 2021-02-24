@@ -11,6 +11,7 @@
     <updated>2022-01-01T00:00:00+00:00</updated>
     <content type="html"/>
     <link href="https://example.com/two" rel="alternate"/>
+    <published>2022-01-01T00:00:00+00:00</published>
   </entry>
   <entry xml:base="https://example.com/three">
     <id>https://example.com/three</id>
@@ -19,5 +20,6 @@
     <content type="html">&lt;p&gt;three&lt;/p&gt;
 </content>
     <link href="https://example.com/three" rel="alternate"/>
+    <published>2020-01-01T00:00:00+00:00</published>
   </entry>
 </feed>
