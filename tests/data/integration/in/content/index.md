@@ -6,6 +6,8 @@ tags-feed: [
   [first-tag],
   [second-tag, third-tag],
 ]
+author:
+  name: global
 ---
 
 index

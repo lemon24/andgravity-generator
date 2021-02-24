@@ -3,6 +3,9 @@
   <id>https://example.com/</id>
   <title>Site #first-tag</title>
   <updated>2023-01-01T00:00:00+00:00</updated>
+  <author>
+    <name>global</name>
+  </author>
   <link href="https://example.com/" rel="alternate"/>
   <link href="https://example.com/_feed/index/_tags/first-tag.xml" rel="self"/>
   <entry xml:base="https://example.com/two">
@@ -17,6 +20,10 @@
     <id>https://example.com/one</id>
     <title>one</title>
     <updated>2023-01-01T00:00:00+00:00</updated>
+    <author>
+      <name>local</name>
+      <email>local@example.com</email>
+    </author>
     <content type="html">&lt;p&gt;&lt;a href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
 </content>

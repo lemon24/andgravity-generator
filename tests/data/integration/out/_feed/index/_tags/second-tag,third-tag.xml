@@ -3,6 +3,9 @@
   <id>https://example.com/</id>
   <title>Site #second-tag #third-tag</title>
   <updated>2022-01-01T00:00:00+00:00</updated>
+  <author>
+    <name>global</name>
+  </author>
   <link href="https://example.com/" rel="alternate"/>
   <link href="https://example.com/_feed/index/_tags/second-tag,third-tag.xml" rel="self"/>
   <entry xml:base="https://example.com/two">

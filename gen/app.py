@@ -117,6 +117,7 @@ def make_feed_response(*args, **kwargs):
 
 def make_feed(thingie, id, tags=None):
     page = thingie.get_page(id)
+    index = thingie.get_page('index')
 
     fg = feedgen.feed.FeedGenerator()
     # TODO: link to tag page once we have one
@@ -124,7 +125,7 @@ def make_feed(thingie, id, tags=None):
 
     feed_title = page.title
     if id != 'index':
-        feed_title = thingie.get_page('index').title + ': ' + feed_title
+        feed_title = index.title + ': ' + feed_title
     if tags:
         feed_title += f" {' '.join(f'#{t}' for t in tags)}"
     fg.title(feed_title)  # required
@@ -134,6 +135,12 @@ def make_feed(thingie, id, tags=None):
     fg.link(href=abs_feed_url_for(id, tags), rel='self')
     # remove the default generator
     fg.generator(generator="")
+
+    author_source = page if 'author' in page.meta else index
+    fg.author(
+        name=author_source.meta['author']['name'],
+        email=author_source.meta['author'].get('email'),
+    )
 
     # sort ascending, because feedgen reverses the entries
     children = list(thingie.get_children(id, sort='published', tags=tags))
@@ -159,6 +166,12 @@ def make_feed(thingie, id, tags=None):
         fe.id(abs_page_url_for(child.id))  # required
         fe.title(child.title)  # required
         fe.link(href=abs_page_url_for(child.id))
+
+        if 'author' in child.meta:
+            fe.author(
+                name=child.meta['author']['name'],
+                email=child.meta['author'].get('email'),
+            )
 
         fe.updated(child.meta.get('updated', child.meta['published']))  # required
         fe.published(child.meta['published'])
