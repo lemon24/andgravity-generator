@@ -270,8 +270,7 @@ def make_markdown(build_url, rewrite_url):
             'footnotes',
             'table',
             'task_lists',
-            # broken at the moment
-            # 'def_list',
+            'def_list',
             mistune.directives.DirectiveToc(),
             mistune.directives.Admonition(),
             make_wiki_plugin(build_url),
