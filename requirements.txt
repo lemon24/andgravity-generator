@@ -8,3 +8,5 @@ pygments
 feedgen
 pytest
 pre-commit
+readtime
+humanize

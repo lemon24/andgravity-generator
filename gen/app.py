@@ -5,8 +5,10 @@ from urllib.parse import urlparse
 
 import feedgen.ext.base
 import feedgen.feed
+import humanize
 import jinja2
 import markupsafe
+import readtime
 from flask import abort
 from flask import Blueprint
 from flask import current_app
@@ -39,6 +41,16 @@ def get_thingie():
 
 
 main_bp = Blueprint('main', __name__)
+
+
+@main_bp.app_template_filter('readtime_minutes')
+def readtime_minutes_filter(html):
+    return readtime.of_html(html).minutes
+
+
+@main_bp.app_template_filter('humanize_apnumber')
+def humanize_apnumber_filter(value):
+    return humanize.apnumber(value)
 
 
 @main_bp.app_template_filter('markdown')
