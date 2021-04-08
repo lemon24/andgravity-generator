@@ -40,7 +40,7 @@ def build_url(url, text=None):
     if url_parsed.hostname:
         raise ValueError(f"node: does not support host yet, got {url!r}")
 
-    # TODO: disallow query strings etc
+    # TODO: disallow query strings, port etc
 
     id = url_parsed.path.lstrip('/')
     if not id:
@@ -50,7 +50,10 @@ def build_url(url, text=None):
     # TODO: raise a nicer exception
     page = get_thingie().get_page(id)
 
-    new_url = url_for("main.page", id=id)
+    if url_parsed.path:
+        new_url = url_for("main.page", id=id)
+    else:
+        new_url = ''
 
     if url_parsed.fragment:
         # fragment existence gets checked somewhere else to avoid cycles

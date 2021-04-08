@@ -28,8 +28,8 @@
 &lt;p&gt;&lt;a href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/one"&gt;label&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/one"&gt;one&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=""&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=""&gt;one&lt;/a&gt;&lt;/p&gt;
 </content>
     <link href="https://example.com/one" rel="alternate"/>
     <published>2021-01-01T00:00:00+00:00</published>
