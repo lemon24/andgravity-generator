@@ -87,7 +87,9 @@ def freeze(project, outdir, force, deploy):
 
     from .app import create_app
 
-    app = create_app(project, project_url.rstrip('/'), enable_checks=False)
+    app = create_app(
+        project, project_url.rstrip('/'), enable_checks=False, cache_markdown=True
+    )
 
     app.config['GEN_FREEZING'] = True
 

@@ -1,6 +1,7 @@
 import ntpath
 import os.path
 import warnings
+from contextlib import nullcontext
 from functools import lru_cache
 from itertools import chain
 from urllib.parse import urlparse
@@ -86,15 +87,8 @@ def humanize_apnumber_filter(value):
     return humanize.apnumber(value)
 
 
-@main_bp.app_template_filter('markdown')
-def markdown_filter(md, id=None):
-    def make_rv():
-        return markupsafe.Markup(current_app.markdown(md))
-
-    if id is None:
-        return make_rv()
-    with current_app.test_request_context(url_for('main.page', id=id)):
-        return make_rv()
+def markdown_filter(*args, **kwargs):
+    return current_app.jinja_env.filters['markdown'](*args, **kwargs)
 
 
 @main_bp.route('/', defaults={'id': 'index'})
@@ -368,7 +362,7 @@ class ListConverter(BaseConverter):
         return ','.join(to_url(value) for value in values)
 
 
-def create_app(project_root, project_url, *, enable_checks=True):
+def create_app(project_root, project_url, *, enable_checks=True, cache_markdown=False):
     app = Flask(
         __name__,
         template_folder=os.path.join(project_root, 'templates'),
@@ -379,11 +373,29 @@ def create_app(project_root, project_url, *, enable_checks=True):
     app.project_url = project_url
     app.jinja_env.undefined = jinja2.StrictUndefined
     app.url_map.converters['list'] = ListConverter
+
     app.add_template_global(get_thingie)
-    app.markdown = make_markdown([build_url, build_file_url])
+
+    markdown = make_markdown([build_url, build_file_url])
+
+    def markdown_filter(md, id=None):
+        if id is None:
+            context = nullcontext()
+        else:
+            context = app.test_request_context(url_for('main.page', id=id))
+        with context:
+            return markupsafe.Markup(markdown(md))
+
+    if cache_markdown:
+        markdown_filter = lru_cache(markdown_filter)
+
+    app.add_template_filter(markdown_filter, 'markdown')
+
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
     app.register_blueprint(file_bp, url_prefix='/_file')
+
+    # import IPython; IPython.embed()
 
     def enable_checks_fn():
         app.register_blueprint(check_bp, url_prefix='/_check')
