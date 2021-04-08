@@ -25,11 +25,34 @@ from .core import Thingie
 from .markdown import make_markdown
 
 
-def build_url(id):
+def build_url(url, text=None):
+    url_parsed = urlparse(url)
+    if url_parsed.scheme not in ('node', ''):
+        return None
+
+    if url_parsed.hostname:
+        raise ValueError(f"node: does not support host yet, got {url!r}")
+
+    # TODO: disallow query strings etc
+
+    id = url_parsed.path.lstrip('/')
+    if not id:
+        id = request.view_args['id']
+
     # check for existence
     # TODO: raise a nicer exception
     page = get_thingie().get_page(id)
-    return url_for("main.page", id=id)
+
+    new_url = url_for("main.page", id=id)
+
+    if url_parsed.fragment:
+        # TODO: check fragments here
+        new_url = f"{new_url}#{url_parsed.fragment}"
+
+    if not text:
+        text = id
+
+    return new_url, text
 
 
 def get_thingie():
@@ -206,7 +229,7 @@ def file(id, path):
     )
 
 
-def build_file_url(url):
+def build_file_url(url, text=None):
     url_parsed = urlparse(url)
     if url_parsed.scheme != 'attachment':
         return None
@@ -221,9 +244,14 @@ def build_file_url(url):
     # TODO: raise a nicer exception
     page = get_thingie().get_page(id)
 
+    if not text:
+        raise ValueError("attachment: getting text not supported yet")
+
+    # TODO: disallow fragments, query string etc
+
     # TODO: maybe raise if the file doesn't exist?
     # the freezer fails for 404s, so it's not urgent
-    return url_for("file.file", id=id, path=path)
+    return url_for("file.file", id=id, path=path), text
 
 
 class ListConverter(BaseConverter):
@@ -247,7 +275,7 @@ def create_app(project_root, project_url):
     app.jinja_env.undefined = jinja2.StrictUndefined
     app.url_map.converters['list'] = ListConverter
     app.add_template_global(get_thingie)
-    app.markdown = make_markdown(build_url, build_file_url)
+    app.markdown = make_markdown([build_url, build_file_url])
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
     app.register_blueprint(file_bp, url_prefix='/_file')

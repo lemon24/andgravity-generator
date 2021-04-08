@@ -7,6 +7,19 @@ author:
   email: local@example.com
 ---
 
-[[two|label]]
+[label](node:two)
 
-[[two]]
+[label](two)
+
+[](node:two)
+
+[](two)
+
+[label]()
+
+[]()
+
+[label](two#fragment)
+
+[label](#fragment)
+

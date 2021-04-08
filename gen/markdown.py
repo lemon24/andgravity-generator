@@ -9,35 +9,6 @@ from pygments.lexers import guess_lexer
 from slugify import slugify
 
 
-WIKI_PATTERN = r'\[\[' r'([\s\S]+?\|?[\s\S]+?)' r'\]\](?!\])'  # [[ link|title ]]
-
-
-def parse_wiki(self, m, state):
-    text = m.group(1)
-    link, sep, title = text.partition('|')
-    link = link.strip()
-    title = title.strip()
-    if not sep:
-        title = None
-    return 'wiki', link, title
-
-
-def make_wiki_plugin(build_url):
-    def render_html_wiki(link, title):
-        link_href = escape_url(build_url(link))
-        if not title:
-            title = link
-        return f'<a href="{link_href}">{title}</a>'
-
-    def plugin_wiki(md):
-        md.inline.register_rule('wiki', WIKI_PATTERN, parse_wiki)
-        md.inline.rules.append('wiki')
-        if md.renderer.NAME == 'html':
-            md.renderer.register('wiki', render_html_wiki)
-
-    return plugin_wiki
-
-
 def do_highlight(code, lang, options=None):
     options = options or {}
     try:
@@ -139,6 +110,8 @@ class MyRenderer(mistune.HTMLRenderer):
         super().__init__(*args, **kwargs)
         self._url_rewriters = list(url_rewriters)
 
+    # BEGIN code highlighting mixin
+
     def block_code(self, code, info=None):
         if info is not None:
             info = info.strip()
@@ -195,21 +168,33 @@ class MyRenderer(mistune.HTMLRenderer):
 
         return html
 
+    # END code highlighting mixin
+
+    # BEGIN table custom class mixin
+
     def table(self, text):
         return '<table class="table">\n' + text + '</table>\n'
 
-    def _rewrite_url(self, url):
+    # END table custom class mixin
+
+    # BEGIN url rewriting mixin
+
+    def _rewrite_url(self, url, text):
         for rewriter in self._url_rewriters:
-            url = rewriter(url) or url
-        return url
+            rv = rewriter(url, text)
+            if rv:
+                url, text = rv
+        return url, text
 
     def link(self, link, text=None, title=None):
-        link = self._rewrite_url(link)
+        link, text = self._rewrite_url(link, text)
         return super().link(link, text, title)
 
     def image(self, src, alt="", title=None):
-        src = self._rewrite_url(src)
+        src, _ = self._rewrite_url(src, None)
         return super().image(src, alt, title)
+
+    # END url rewriting mixin
 
 
 def record_toc_heading(text, level, state):
@@ -262,9 +247,9 @@ def plugin_footnotes_fix(md):
         md.renderer.register('footnote_item', render_html_footnote_item)
 
 
-def make_markdown(build_url, rewrite_url):
+def make_markdown(url_rewriters):
     return mistune.create_markdown(
-        renderer=MyRenderer(escape=False, url_rewriters=[rewrite_url]),
+        renderer=MyRenderer(escape=False, url_rewriters=url_rewriters),
         plugins=[
             'strikethrough',
             'footnotes',
@@ -273,7 +258,6 @@ def make_markdown(build_url, rewrite_url):
             'def_list',
             mistune.directives.DirectiveToc(),
             mistune.directives.Admonition(),
-            make_wiki_plugin(build_url),
             plugin_toc_fix,
             plugin_footnotes_fix,
         ],

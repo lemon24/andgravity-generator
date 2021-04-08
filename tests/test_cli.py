@@ -14,7 +14,7 @@ def walk(path):
             yield os.path.relpath(os.path.join(root, file), path)
 
 
-def test_freeze(tmp_path):
+def test_freeze(tmp_path, subtests):
     input_dir = ROOT.joinpath('data/integration/in')
     expected_dir = ROOT.joinpath('data/integration/out')
     output_dir = tmp_path.joinpath('out')
@@ -33,8 +33,9 @@ def test_freeze(tmp_path):
     assert expected_files == output_files
 
     for file in expected_files:
-        with expected_dir.joinpath(file).open() as f:
-            expected = f.read()
-        with output_dir.joinpath(file).open() as f:
-            output = f.read()
-        assert expected == output, file
+        with subtests.test(file):
+            with expected_dir.joinpath(file).open() as f:
+                expected = f.read()
+            with output_dir.joinpath(file).open() as f:
+                output = f.read()
+            assert expected == output, file
