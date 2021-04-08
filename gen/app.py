@@ -1,14 +1,19 @@
 import ntpath
 import os.path
+import warnings
+from functools import lru_cache
 from itertools import chain
 from urllib.parse import urlparse
 
+import bs4
 import feedgen.ext.base
 import feedgen.feed
+import flask
 import humanize
 import jinja2
 import markupsafe
 import readtime
+import soupsieve.util
 from flask import abort
 from flask import Blueprint
 from flask import current_app
@@ -19,6 +24,8 @@ from flask import request
 from flask import Response
 from flask import send_from_directory
 from flask import url_for
+from flask.json import jsonify
+from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 
 from .core import Thingie
@@ -46,7 +53,7 @@ def build_url(url, text=None):
     new_url = url_for("main.page", id=id)
 
     if url_parsed.fragment:
-        # TODO: check fragments here
+        # fragment existence gets checked somewhere else to avoid cycles
         new_url = f"{new_url}#{url_parsed.fragment}"
 
     if not text:
@@ -100,6 +107,101 @@ def page(id):
         [os.path.join('custom', id + '.html'), 'base.html']
     )
     return render_template(template, page=page)
+
+
+check_bp = Blueprint('check', __name__)
+
+warnings.filterwarnings(
+    'ignore', message='No parser was explicitly specified', module='gen.app'
+)
+
+
+@check_bp.route('/internal-urls.json')
+def internal_urls():
+    # TODO: also check attachments/images here?
+
+    url_adapter = flask._request_ctx_stack.top.url_adapter
+    thingie = get_thingie()
+
+    @lru_cache
+    def get_soup(id):
+        return bs4.BeautifulSoup(markdown_filter(thingie.get_page(id).content, id=id))
+
+    @lru_cache
+    def check_id(id):
+        try:
+            thingie.get_page(match_id)
+            return None
+        except FileNotFoundError:
+            return "node not found"
+
+    @lru_cache
+    def check_fragment(id, fragment):
+        soup = get_soup(id)
+        for selector_fmt in ('[id="{}"]', 'a[name="{}"]'):
+            # TODO: escape fragment
+            selector = selector_fmt.format(fragment)
+            try:
+                if soup.select(selector):
+                    return None
+            except soupsieve.util.SelectorSyntaxError:
+                return "invalid fragment"
+        return "fragment not found"
+
+    @lru_cache
+    def match_node_url(url):
+        try:
+            return url_adapter.match(url)
+        except HTTPException as e:
+            return None
+
+    errors = {}
+    data = {}
+
+    for id in thingie.get_page_ids(hidden=None, discoverable=None):
+        soup = get_soup(id)
+
+        data[id] = urls = {}
+
+        for anchor in soup.find_all('a'):
+            url = anchor.get('href')
+            if not url:
+                continue
+
+            if url in urls:
+                continue
+
+            url_parsed = urlparse(url)
+            if url_parsed.scheme not in ('http', 'https', ''):
+                continue
+
+            if not url_parsed.hostname and not url_parsed.path:
+                url_parsed = url_parsed._replace(
+                    path=urlparse(url_for('main.page', id=id)).path
+                )
+
+            match = match_node_url(url_parsed._replace(fragment='').geturl())
+            if not match:
+                continue
+
+            match_endpoint, match_args = match
+            if match_endpoint != 'main.page':
+                continue
+
+            match_id = match_args['id']
+
+            # check for existence; it'll also check links not intercepted by build_url (plain HTML)
+            error = check_id(match_id)
+            if not error and url_parsed.fragment:
+                error = check_fragment(match_id, url_parsed.fragment)
+
+            urls[url] = {'error': error}
+            if error:
+                errors.setdefault(id, {})[url] = error
+
+    rv = {'errors': errors, 'data': data}
+
+    return jsonify(rv)
 
 
 feed_bp = Blueprint('feed', __name__)
@@ -263,7 +365,7 @@ class ListConverter(BaseConverter):
         return ','.join(to_url(value) for value in values)
 
 
-def create_app(project_root, project_url):
+def create_app(project_root, project_url, *, enable_checks=True):
     app = Flask(
         __name__,
         template_folder=os.path.join(project_root, 'templates'),
@@ -279,4 +381,12 @@ def create_app(project_root, project_url):
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
     app.register_blueprint(file_bp, url_prefix='/_file')
+
+    def enable_checks_fn():
+        app.register_blueprint(check_bp, url_prefix='/_check')
+
+    app.enable_checks = enable_checks_fn
+    if enable_checks:
+        app.enable_checks()
+
     return app

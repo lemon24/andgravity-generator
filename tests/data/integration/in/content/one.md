@@ -19,7 +19,3 @@ author:
 
 []()
 
-[label](two#fragment)
-
-[label](#fragment)
-

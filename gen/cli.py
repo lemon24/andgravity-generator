@@ -1,9 +1,11 @@
+import json
 import os.path
 import subprocess
 import threading
 import webbrowser
 
 import click
+import yaml
 
 from .core import Thingie
 from .freeze import make_freezer
@@ -85,7 +87,7 @@ def freeze(project, outdir, force, deploy):
 
     from .app import create_app
 
-    app = create_app(project, project_url.rstrip('/'))
+    app = create_app(project, project_url.rstrip('/'), enable_checks=False)
 
     app.config['GEN_FREEZING'] = True
 
@@ -105,6 +107,14 @@ def freeze(project, outdir, force, deploy):
     with progressbar as urls:
         for url in urls:
             pass
+
+    app.enable_checks()
+    test_client = app.test_client()
+
+    errors = test_client.get('/_check/internal-urls.json').json['errors']
+    if errors:
+        errors_str = yaml.safe_dump(errors)
+        raise click.ClickException(f"Broken internal URLs:\n\n{errors_str}\n")
 
     # TODO: these should be per-freezer (it's only suitable for github pages)
     # TODO: maybe get the freezer to not clobber them

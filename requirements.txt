@@ -11,3 +11,4 @@ pytest-subtests
 pre-commit
 readtime
 humanize
+beautifulsoup4
