@@ -8,54 +8,34 @@ class Thingie:
 
     # TODO: pluggable loader
 
-    def get_page_ids(self, hidden=False, discoverable=True, tags=None):
-        for entry in os.scandir(self.path):
-            if not entry.is_file():
-                continue
-            name, ext = os.path.splitext(entry.name)
-            if ext != '.md':
-                continue
-
-            # TODO: this is inefficient
-            page = self.get_page(name)
-            meta = page.meta
-
-            if hidden is not None:
-                # TODO: hidden pages will still be generated if someone links them explicitly
-                if bool(meta.get('hidden', False)) is not bool(hidden):
-                    continue
-
-            if discoverable is not None:
-                if bool(meta.get('discoverable', True)) is not bool(discoverable):
-                    continue
-
-            if tags is not None:
-                if not any(tag in page.tags for tag in tags):
-                    continue
-
-            yield name
-
-    def page_exists(self, id):
-        return os.path.exists(os.path.join(self.path, id) + '.md')
-
-    def get_page(self, id):
-        with open(os.path.join(self.path, id) + '.md') as f:
-            metadata = load_metadata(f) or {}
-            content = f.read()
-        return Page(id, content, metadata)
-
-    def get_children(
-        self, id, sort='id', reverse=False, hidden=False, discoverable=True, tags=None
+    def get_pages(
+        self, *, hidden=False, discoverable=True, tags=None, sort='id', reverse=False
     ):
         def generate():
-            if id != 'index':
-                return
-            # TODO: order by something
-            ids = self.get_page_ids(hidden=hidden, discoverable=discoverable, tags=tags)
-            for child_id in ids:
-                if child_id == 'index':
+            for entry in os.scandir(self.path):
+                if not entry.is_file():
                     continue
-                yield self.get_page(child_id)
+                name, ext = os.path.splitext(entry.name)
+                if ext != '.md':
+                    continue
+
+                page = self.get_page(name)
+                meta = page.meta
+
+                if hidden is not None:
+                    # TODO: hidden pages will still be generated if someone links them explicitly
+                    if bool(meta.get('hidden', False)) is not bool(hidden):
+                        continue
+
+                if discoverable is not None:
+                    if bool(meta.get('discoverable', True)) is not bool(discoverable):
+                        continue
+
+                if tags is not None:
+                    if not any(tag in page.tags for tag in tags):
+                        continue
+
+                yield page
 
         rv = generate()
         if sort == 'id':
@@ -67,6 +47,45 @@ class Thingie:
             raise ValueError(f"unknown sort: {sort!r}")
 
         return iter(rv)
+
+    def get_page_ids(self, *, hidden=False, discoverable=True, tags=None):
+        # TODO: this is inefficient
+        for page in self.get_pages(hidden=hidden, discoverable=discoverable, tags=tags):
+            yield page.id
+
+    def page_exists(self, id):
+        return os.path.exists(os.path.join(self.path, id) + '.md')
+
+    def get_page(self, id):
+        with open(os.path.join(self.path, id) + '.md') as f:
+            metadata = load_metadata(f) or {}
+            content = f.read()
+        return Page(id, content, metadata)
+
+    def get_children(
+        self,
+        id,
+        *,
+        sort='id',
+        reverse=False,
+        hidden=False,
+        discoverable=True,
+        tags=None,
+    ):
+        if id != 'index':
+            return
+
+        children = self.get_pages(
+            hidden=hidden,
+            discoverable=discoverable,
+            tags=tags,
+            sort=sort,
+            reverse=reverse,
+        )
+        for child in children:
+            if child.id == 'index':
+                continue
+            yield child
 
 
 @dataclass
@@ -108,6 +127,10 @@ class Page:
                 if not isinstance(tag, str):
                     raise error
         return tags_feed
+
+    @property
+    def series(self):
+        return [tag for tag in self.tags if tag.startswith('series-')]
 
 
 import yaml
