@@ -119,10 +119,12 @@ def internal_urls():
 
     url_adapter = flask._request_ctx_stack.top.url_adapter
     thingie = get_thingie()
+    test_client = current_app.test_client()
 
     @lru_cache
     def get_soup(id):
-        return bs4.BeautifulSoup(markdown_filter(thingie.get_page(id).content, id=id))
+        html = test_client.get(url_for('main.page', id=id)).data
+        return bs4.BeautifulSoup(html)
 
     @lru_cache
     def check_id(id):
