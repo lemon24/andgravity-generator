@@ -43,6 +43,7 @@ def test_freeze(tmp_path, subtests):
 
 BROKEN_LINKS_YAML = """\
 one:
+  /inexistent-node: node not found
   /two#a-name-error: fragment not found
   /two#header-error: fragment not found
   /two#id-error: fragment not found

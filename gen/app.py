@@ -25,7 +25,6 @@ from flask import request
 from flask import Response
 from flask import send_from_directory
 from flask import url_for
-from flask.json import jsonify
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 
@@ -109,86 +108,96 @@ warnings.filterwarnings(
 )
 
 
+def get_page_fragments(id):
+    # TODO: this is temporary, until we fix caching (maybe?)
+    get_soup = request.get_soup
+
+    soup = get_soup(id)
+    rv = set()
+
+    for element in soup.select('[id], a[name]'):
+        if 'id' in element.attrs:
+            rv.add(element['id'])
+        if element.name == 'a' and 'name' in element.attrs:
+            rv.add(element['name'])
+
+    return rv
+
+
+def match_app_url(url):
+    url_adapter = flask._request_ctx_stack.top.url_adapter
+    try:
+        return url_adapter.match(url)
+    except HTTPException as e:
+        return None
+
+
+def get_internal_links(id):
+    # TODO: this is temporary, until we fix caching (maybe?)
+    get_soup = request.get_soup
+
+    soup = get_soup(id)
+    rv = set()
+    seen = set()
+
+    for anchor in soup.select('a[href]'):
+        url = anchor['href']
+
+        if url in seen:
+            continue
+
+        seen.add(url)
+
+        url_parsed = urlparse(url)
+        if url_parsed.scheme not in ('http', 'https', ''):
+            continue
+
+        if not url_parsed.hostname and not url_parsed.path:
+            url_parsed = url_parsed._replace(
+                path=urlparse(url_for('main.page', id=id)).path
+            )
+
+        match = match_app_url(url_parsed._replace(fragment='').geturl())
+        if not match:
+            continue
+
+        match_endpoint, match_args = match
+        if match_endpoint != 'main.page':
+            continue
+
+        rv.add((url, match_args['id'], url_parsed.fragment))
+
+    return rv
+
+
 @check_bp.route('/internal-urls.json')
 def internal_urls():
     # TODO: also check attachments/images here?
 
-    url_adapter = flask._request_ctx_stack.top.url_adapter
     thingie = get_thingie()
-    test_client = current_app.test_client()
 
     @lru_cache
     def get_soup(id):
-        html = test_client.get(url_for('main.page', id=id)).data
-        return bs4.BeautifulSoup(html)
+        return bs4.BeautifulSoup(render_node(id))
 
-    @lru_cache
-    def check_id(id):
-        try:
-            thingie.get_page(match_id)
-            return None
-        except FileNotFoundError:
-            return "node not found"
-
-    @lru_cache
-    def check_fragment(id, fragment):
-        soup = get_soup(id)
-        for selector_fmt in ('[id="{}"]', 'a[name="{}"]'):
-            # TODO: escape fragment
-            selector = selector_fmt.format(fragment)
-            try:
-                if soup.select(selector):
-                    return None
-            except soupsieve.util.SelectorSyntaxError:
-                return "invalid fragment"
-        return "fragment not found"
-
-    @lru_cache
-    def match_node_url(url):
-        try:
-            return url_adapter.match(url)
-        except HTTPException as e:
-            return None
+    request.get_soup = get_soup
 
     errors = {}
     data = {}
 
     for id in thingie.get_page_ids(hidden=None, discoverable=None):
-        soup = get_soup(id)
-
         data[id] = urls = {}
 
-        for anchor in soup.find_all('a'):
-            url = anchor.get('href')
-            if not url:
-                continue
+        for url, target_id, fragment in get_internal_links(id):
+            error = None
 
-            if url in urls:
-                continue
-
-            url_parsed = urlparse(url)
-            if url_parsed.scheme not in ('http', 'https', ''):
-                continue
-
-            if not url_parsed.hostname and not url_parsed.path:
-                url_parsed = url_parsed._replace(
-                    path=urlparse(url_for('main.page', id=id)).path
-                )
-
-            match = match_node_url(url_parsed._replace(fragment='').geturl())
-            if not match:
-                continue
-
-            match_endpoint, match_args = match
-            if match_endpoint != 'main.page':
-                continue
-
-            match_id = match_args['id']
-
-            # check for existence; it'll also check links not intercepted by build_url (plain HTML)
-            error = check_id(match_id)
-            if not error and url_parsed.fragment:
-                error = check_fragment(match_id, url_parsed.fragment)
+            try:
+                thingie.get_page(target_id)
+            except FileNotFoundError:
+                error = "node not found"
+            else:
+                if fragment and fragment not in get_page_fragments(target_id):
+                    error = "fragment not found"
 
             urls[url] = {'error': error}
             if error:
@@ -196,7 +205,7 @@ def internal_urls():
 
     rv = {'errors': errors, 'data': data}
 
-    return jsonify(rv)
+    return rv
 
 
 feed_bp = Blueprint('feed', __name__)
