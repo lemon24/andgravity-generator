@@ -12,3 +12,4 @@ pre-commit
 readtime
 humanize
 beautifulsoup4
+diskcache

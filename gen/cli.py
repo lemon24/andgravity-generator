@@ -1,6 +1,7 @@
 import functools
 import json
 import os.path
+import pathlib
 import subprocess
 import threading
 import webbrowser
@@ -8,6 +9,7 @@ import webbrowser
 import click
 import yaml
 
+import gen
 from .core import Thingie
 from .freeze import make_freezer
 
@@ -62,8 +64,10 @@ def serve(project, host, port, open):
     default=None,
     help="If OUTDIR is a git repo, add all changed, commit, and push.",
 )
+@click.option('--cache/--no-cache', 'cache_option')
 @click.pass_obj
-def freeze(project, outdir, force, deploy):
+@click.pass_context
+def freeze(ctx, project, outdir, force, deploy, cache_option):
     stdout_isatty = click.get_text_stream('stdout').isatty()
     confirm_overwrite = os.path.exists(outdir) and not force
 
@@ -83,8 +87,69 @@ def freeze(project, outdir, force, deploy):
             click.echo(f"{outdir} exists, but --force not passed.")
             raise click.Abort()
 
-    thingie = Thingie(os.path.join(project, 'content'))
+    content_root = os.path.join(project, 'content')
+    thingie = Thingie(content_root)
     project_url = thingie.get_page('index').meta['project-url']
+
+    # TODO: move the functions we're caching on an object that doesn't have anything to do with the app;
+    # it's likely Thingie will already have a sqlite cache for metadata/tags (to make queries faster), reuse that
+    # TODO: diskcache is threadsafe, a sqlite connection ^ isn't; rework how the app spawns objects
+
+    if cache_option:
+        import diskcache
+
+        cache = diskcache.Cache(os.path.join(project, '.gen.cache'))
+        ctx.call_on_close(cache.close)
+
+        def node_cache_decorator(fn):
+            @functools.wraps(fn)
+            def wrapper(id):
+                key = f'{fn.__module__}.{fn.__qualname__}', id
+
+                rv = cache.get(key)
+                if rv is not None:
+                    return rv
+
+                rv = fn(id)
+                cache.set(key, rv, tag=f'node:{id}')
+                return rv
+
+            return wrapper
+
+        old_mtimes = cache.get('mtimes', {})
+        new_mtimes = {}
+
+        def check_mtime(key, path, glob):
+            old_mtime = old_mtimes.get(key, 0)
+            new_mtime = old_mtime
+            for path in pathlib.Path(path).glob(glob):
+                new_mtime = max(new_mtime, path.stat().st_mtime)
+            if new_mtime > old_mtime:
+                new_mtimes[key] = new_mtime
+
+        check_mtime('dir:gen', gen.__path__[0], '**/*.py')
+        check_mtime('dir:templates', os.path.join(project, 'templates'), '**/*')
+
+        for id, path in thingie.get_page_paths():
+            check_mtime(f'node:{id}', content_root, path)
+
+        print(new_mtimes)
+
+        if new_mtimes:
+            if any(key.startswith('dir:') for key in new_mtimes):
+                cache.clear(retry=True)
+            else:
+                for key in new_mtimes:
+                    assert key.startswith('node:'), key
+                    cache.evict(key, retry=False)
+
+            mtimes = old_mtimes.copy()
+            mtimes.update(new_mtimes)
+
+            cache.set('mtimes', mtimes)
+
+    else:
+        node_cache_decorator = functools.lru_cache
 
     from .app import create_app
 
@@ -92,7 +157,8 @@ def freeze(project, outdir, force, deploy):
         project,
         project_url.rstrip('/'),
         enable_checks=False,
-        node_cache_decorator=functools.lru_cache,
+        node_cache_decorator=node_cache_decorator,
+        # TODO: this is not needed, loading the xml/html is very fast
         ephemeral_node_cache_decorator=functools.lru_cache,
     )
 

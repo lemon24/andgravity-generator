@@ -8,17 +8,20 @@ class Thingie:
 
     # TODO: pluggable loader
 
+    def get_page_paths(self):
+        for entry in os.scandir(self.path):
+            if not entry.is_file():
+                continue
+            name, ext = os.path.splitext(entry.name)
+            if ext != '.md':
+                continue
+            yield name, entry.name
+
     def get_pages(
         self, *, hidden=False, discoverable=True, tags=None, sort='id', reverse=False
     ):
         def generate():
-            for entry in os.scandir(self.path):
-                if not entry.is_file():
-                    continue
-                name, ext = os.path.splitext(entry.name)
-                if ext != '.md':
-                    continue
-
+            for name, _ in self.get_page_paths():
                 page = self.get_page(name)
                 meta = page.meta
 
