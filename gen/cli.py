@@ -1,3 +1,4 @@
+import functools
 import json
 import os.path
 import subprocess
@@ -88,7 +89,10 @@ def freeze(project, outdir, force, deploy):
     from .app import create_app
 
     app = create_app(
-        project, project_url.rstrip('/'), enable_checks=False, cache_markdown=True
+        project,
+        project_url.rstrip('/'),
+        enable_checks=False,
+        node_cache_decorator=functools.lru_cache,
     )
 
     app.config['GEN_FREEZING'] = True

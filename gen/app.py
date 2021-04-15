@@ -108,7 +108,7 @@ warnings.filterwarnings(
 )
 
 
-def get_page_fragments(id):
+def _get_page_fragments(id):
     # TODO: this is temporary, until we fix caching (maybe?)
     get_soup = request.get_soup
 
@@ -132,7 +132,7 @@ def match_app_url(url):
         return None
 
 
-def get_internal_links(id):
+def _get_internal_links(id):
     # TODO: this is temporary, until we fix caching (maybe?)
     get_soup = request.get_soup
 
@@ -188,7 +188,7 @@ def internal_urls():
     for id in thingie.get_page_ids(hidden=None, discoverable=None):
         data[id] = urls = {}
 
-        for url, target_id, fragment in get_internal_links(id):
+        for url, target_id, fragment in current_app.get_internal_links(id):
             error = None
 
             try:
@@ -196,7 +196,9 @@ def internal_urls():
             except FileNotFoundError:
                 error = "node not found"
             else:
-                if fragment and fragment not in get_page_fragments(target_id):
+                if fragment and fragment not in current_app.get_page_fragments(
+                    target_id
+                ):
                     error = "fragment not found"
 
             urls[url] = {'error': error}
@@ -384,7 +386,12 @@ def render_node(id=None):
     return current_app.render_node(id)
 
 
-def create_app(project_root, project_url, *, enable_checks=True, cache_markdown=False):
+NODE_FUNCTIONS = [_render_node, _get_internal_links, _get_page_fragments]
+
+
+def create_app(
+    project_root, project_url, *, enable_checks=True, node_cache_decorator=None
+):
     app = Flask(
         __name__,
         template_folder=os.path.join(project_root, 'templates'),
@@ -400,9 +407,10 @@ def create_app(project_root, project_url, *, enable_checks=True, cache_markdown=
 
     app.markdown = make_markdown([build_url, build_file_url])
 
-    app.render_node = _render_node
-    if cache_markdown:
-        app.render_node = lru_cache(app.render_node)
+    for func in NODE_FUNCTIONS:
+        if node_cache_decorator:
+            func = node_cache_decorator(func)
+        setattr(app, func.__name__.lstrip('_'), func)
 
     app.add_template_global(render_node)
 
