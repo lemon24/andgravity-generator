@@ -1,8 +1,8 @@
+import functools
 import ntpath
 import os.path
 import warnings
 from contextlib import nullcontext
-from functools import lru_cache
 from itertools import chain
 from urllib.parse import urlparse
 
@@ -109,9 +109,6 @@ warnings.filterwarnings(
 
 
 def _get_page_fragments(id):
-    # TODO: this is temporary, until we fix caching (maybe?)
-    get_soup = request.get_soup
-
     soup = get_soup(id)
     rv = set()
 
@@ -133,20 +130,14 @@ def match_app_url(url):
 
 
 def _get_internal_links(id):
-    # TODO: this is temporary, until we fix caching (maybe?)
-    get_soup = request.get_soup
-
     soup = get_soup(id)
-    rv = set()
-    seen = set()
+    rv = {}
 
     for anchor in soup.select('a[href]'):
         url = anchor['href']
 
-        if url in seen:
+        if url in rv:
             continue
-
-        seen.add(url)
 
         url_parsed = urlparse(url)
         if url_parsed.scheme not in ('http', 'https', ''):
@@ -162,12 +153,22 @@ def _get_internal_links(id):
             continue
 
         match_endpoint, match_args = match
-        if match_endpoint != 'main.page':
-            continue
 
-        rv.add((url, match_args['id'], url_parsed.fragment))
+        rv[url] = (match_endpoint, match_args, url_parsed.fragment)
 
     return rv
+
+
+def _get_soup(id):
+    return bs4.BeautifulSoup(render_node(id))
+
+
+def get_soup(id):
+    try:
+        fn = request.get_soup
+    except (RuntimeError, AttributeError):
+        fn = current_app.get_soup
+    return fn(id)
 
 
 @check_bp.route('/internal-urls.json')
@@ -176,11 +177,12 @@ def internal_urls():
 
     thingie = get_thingie()
 
-    @lru_cache
-    def get_soup(id):
-        return bs4.BeautifulSoup(render_node(id))
-
-    request.get_soup = get_soup
+    # if the app get_soup() is not cached, cache it, else use as-is;
+    # remove if this ends up using too much memory
+    if current_app.get_soup is _get_soup:
+        request.get_soup = functools.lru_cache(_get_soup)
+    else:
+        request.get_soup = current_app.get_soup
 
     errors = {}
     data = {}
@@ -188,7 +190,12 @@ def internal_urls():
     for id in thingie.get_page_ids(hidden=None, discoverable=None):
         data[id] = urls = {}
 
-        for url, target_id, fragment in current_app.get_internal_links(id):
+        internal_links = current_app.get_internal_links(id)
+        for url, (endpoint, args, fragment) in internal_links.items():
+            if endpoint != 'main.page':
+                continue
+            target_id = args['id']
+
             error = None
 
             try:
@@ -196,10 +203,10 @@ def internal_urls():
             except FileNotFoundError:
                 error = "node not found"
             else:
-                if fragment and fragment not in current_app.get_page_fragments(
-                    target_id
-                ):
-                    error = "fragment not found"
+                if fragment:
+                    fragments = current_app.get_page_fragments(target_id)
+                    if fragment not in fragments:
+                        error = "fragment not found"
 
             urls[url] = {'error': error}
             if error:
@@ -221,7 +228,7 @@ def abs_feed_url_for(id, tags=None):
     if not tags:
         url = url_for('feed.feed', id=id)
     else:
-        url = url_for('feed.tags_feed', id=id, tags=tags)
+        url = url_for('feed.tag_feed', id=id, tags=tags)
     return current_app.project_url + url
 
 
@@ -237,7 +244,7 @@ def feed(id):
 
 
 @feed_bp.route('/<id>/_tags/<list:tags>.xml')
-def tags_feed(id, tags):
+def tag_feed(id, tags):
     # TODO: check tags exist in thingie
     # TODO: check tags are in canonical order
     return make_feed_response(id, tags)
@@ -387,10 +394,23 @@ def render_node(id=None):
 
 
 NODE_FUNCTIONS = [_render_node, _get_internal_links, _get_page_fragments]
+EPHEMERAL_NODE_FUNCTIONS = [_get_soup]
+
+
+def _install_functions(app, functions, decorator=None):
+    for func in functions:
+        if decorator:
+            func = decorator(func)
+        setattr(app, func.__name__.lstrip('_'), func)
 
 
 def create_app(
-    project_root, project_url, *, enable_checks=True, node_cache_decorator=None
+    project_root,
+    project_url,
+    *,
+    enable_checks=True,
+    node_cache_decorator=None,
+    ephemeral_node_cache_decorator=None,
 ):
     app = Flask(
         __name__,
@@ -407,10 +427,8 @@ def create_app(
 
     app.markdown = make_markdown([build_url, build_file_url])
 
-    for func in NODE_FUNCTIONS:
-        if node_cache_decorator:
-            func = node_cache_decorator(func)
-        setattr(app, func.__name__.lstrip('_'), func)
+    _install_functions(app, NODE_FUNCTIONS, node_cache_decorator)
+    _install_functions(app, EPHEMERAL_NODE_FUNCTIONS, ephemeral_node_cache_decorator)
 
     app.add_template_global(render_node)
 

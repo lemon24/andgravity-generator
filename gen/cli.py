@@ -93,6 +93,7 @@ def freeze(project, outdir, force, deploy):
         project_url.rstrip('/'),
         enable_checks=False,
         node_cache_decorator=functools.lru_cache,
+        ephemeral_node_cache_decorator=functools.lru_cache,
     )
 
     app.config['GEN_FREEZING'] = True

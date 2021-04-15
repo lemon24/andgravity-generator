@@ -113,12 +113,12 @@ class Page:
         return tags
 
     @property
-    def tags_feed(self):
-        tags_feed = self.meta.get('tags-feed') or []
-        error = ValueError(f"bad tags-feed for {self.id}: {tags_feed!r}")
-        if not isinstance(tags_feed, list):
+    def tag_feeds(self):
+        tag_feeds = self.meta.get('tag-feeds') or []
+        error = ValueError(f"bad tags-feed for {self.id}: {tag_feeds!r}")
+        if not isinstance(tag_feeds, list):
             raise error
-        for tags in tags_feed:
+        for tags in tag_feeds:
             if not isinstance(tags, list):
                 raise error
             if not tags:
@@ -126,7 +126,14 @@ class Page:
             for tag in tags:
                 if not isinstance(tag, str):
                     raise error
-        return tags_feed
+        return tag_feeds
+
+    @property
+    def has_feed(self):
+        has_feed = self.meta.get('has-feed', False)
+        if not isinstance(has_feed, bool):
+            raise ValueError(f"bad has-feed for {self.id}: {has_feed!r}")
+        return has_feed
 
     @property
     def series(self):

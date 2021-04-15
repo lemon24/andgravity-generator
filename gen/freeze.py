@@ -2,7 +2,7 @@ import ntpath
 import os.path
 
 import flask_frozen
-from flask import current_app
+from flask import url_for
 
 from .app import get_thingie
 
@@ -26,26 +26,40 @@ class GitHubPagesFreezer(flask_frozen.Freezer):
 
 
 def make_freezer(app):
-    freezer = GitHubPagesFreezer(app)
+    freezer = GitHubPagesFreezer(app, log_url_for=True)
+
+    # when developing URL generators, log_url_for should be False,
+    # to make you're generating a URL and it's not from a template;
+    # the rest of the time, log_url_for should be True,
+    # to catch broken URLs in templates
+    #
+    # note that with log_url_for=True, we may actually generate a hidden
+    # node if it's referred to from a template; maybe we should fix that
 
     @freezer.register_generator
     def page():
         for id in get_thingie().get_page_ids(discoverable=None):
-            yield '.page', {'id': id}
-
-    # we deliberately do not generate anything for feed,
-    # because we only want to generate the feeds linked from
-    # templates; later, we can use a has-feed page metadata
-
-    # same for file, at least initially
-
-    # the tags feed(s) happen on-demand, though
+            yield 'main.page', {'id': id}
 
     @freezer.register_generator
-    def tags_feed():
+    def feed():
+        for page in get_thingie().get_pages(discoverable=None):
+            if page.has_feed:
+                yield 'feed.feed', {'id': page.id}
+
+    @freezer.register_generator
+    def file():
+        # only yield linked files
+        for id in get_thingie().get_page_ids(discoverable=None):
+            for endpoint, args, _ in app.get_internal_links(id).values():
+                if endpoint == 'file.file':
+                    yield 'file.file', args
+
+    @freezer.register_generator
+    def tag_feed():
         for id in get_thingie().get_page_ids(discoverable=None):
             page = get_thingie().get_page(id)
-            for tags in page.tags_feed:
-                yield 'feed.tags_feed', {'id': id, 'tags': tags}
+            for tags in page.tag_feeds:
+                yield 'feed.tag_feed', {'id': id, 'tags': tags}
 
     return freezer
