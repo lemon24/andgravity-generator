@@ -87,10 +87,6 @@ def humanize_apnumber_filter(value):
     return humanize.apnumber(value)
 
 
-def markdown_filter(*args, **kwargs):
-    return current_app.jinja_env.filters['markdown'](*args, **kwargs)
-
-
 @main_bp.route('/', defaults={'id': 'index'})
 @main_bp.route('/<id>')
 def page(id):
@@ -313,7 +309,7 @@ def make_feed(thingie, id, tags=None):
         fe.published(child.meta['published'])
 
         # TODO: summary feature
-        fe.content(content=markdown_filter(child.content, id=child.id), type='html')
+        fe.content(content=render_node(child.id), type='html')
 
     return fg
 
@@ -364,6 +360,21 @@ class ListConverter(BaseConverter):
         return ','.join(to_url(value) for value in values)
 
 
+def _render_node(id):
+    page = get_thingie().get_page(id)
+    url = url_for('main.page', id=id)
+    with current_app.test_request_context(url):
+        html = current_app.markdown(page.content)
+    return markupsafe.Markup(html)
+
+
+def render_node(id=None):
+    if id is None:
+        id = request.view_args['id']
+    # a level of indirection to allow caching stuff, maybe
+    return current_app.render_node(id)
+
+
 def create_app(project_root, project_url, *, enable_checks=True, cache_markdown=False):
     app = Flask(
         __name__,
@@ -378,26 +389,17 @@ def create_app(project_root, project_url, *, enable_checks=True, cache_markdown=
 
     app.add_template_global(get_thingie)
 
-    markdown = make_markdown([build_url, build_file_url])
+    app.markdown = make_markdown([build_url, build_file_url])
 
-    def markdown_filter(md, id=None):
-        if id is None:
-            context = nullcontext()
-        else:
-            context = app.test_request_context(url_for('main.page', id=id))
-        with context:
-            return markupsafe.Markup(markdown(md))
-
+    app.render_node = _render_node
     if cache_markdown:
-        markdown_filter = lru_cache(markdown_filter)
+        app.render_node = lru_cache(app.render_node)
 
-    app.add_template_filter(markdown_filter, 'markdown')
+    app.add_template_global(render_node)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
     app.register_blueprint(file_bp, url_prefix='/_file')
-
-    # import IPython; IPython.embed()
 
     def enable_checks_fn():
         app.register_blueprint(check_bp, url_prefix='/_check')
