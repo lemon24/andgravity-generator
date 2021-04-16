@@ -46,17 +46,12 @@ def build_url(url, text=None):
     if not id:
         id = request.view_args['id']
 
-    # check for existence
-    # TODO: raise a nicer exception
-    page = get_thingie().get_page(id)
-
     if url_parsed.path:
         new_url = url_for("main.page", id=id)
     else:
         new_url = ''
 
     if url_parsed.fragment:
-        # fragment existence gets checked somewhere else to avoid cycles
         new_url = f"{new_url}#{url_parsed.fragment}"
 
     if not text:
@@ -355,17 +350,12 @@ def build_file_url(url, text=None):
     path = url_parsed.path.lstrip('/')
 
     id = request.view_args['id']
-    # check for existence
-    # TODO: raise a nicer exception
-    page = get_thingie().get_page(id)
 
     if not text:
         raise ValueError("attachment: getting text not supported yet")
 
     # TODO: disallow fragments, query string etc
 
-    # TODO: maybe raise if the file doesn't exist?
-    # the freezer fails for 404s, so it's not urgent
     return url_for("file.file", id=id, path=path), text
 
 
