@@ -97,7 +97,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
     if cache_option:
         import diskcache
 
-        cache = diskcache.Cache(os.path.join(project, '.gen.cache'))
+        cache = diskcache.Cache(os.path.join(project, '.gen/cache/data'))
         ctx.call_on_close(cache.close)
 
         def node_cache_decorator(fn):
@@ -150,12 +150,17 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
         node_cache_decorator = functools.lru_cache
 
     from .app import create_app
+    from jinja2 import FileSystemBytecodeCache
 
     app = create_app(
         project,
         enable_checks=False,
         node_cache_decorator=node_cache_decorator,
     )
+
+    jinja_cache_path = os.path.join(project, '.gen/cache/jinja')
+    os.makedirs(jinja_cache_path, exist_ok=True)
+    app.jinja_env.bytecode_cache = FileSystemBytecodeCache(jinja_cache_path, '%s.cache')
 
     app.config['GEN_FREEZING'] = True
 
