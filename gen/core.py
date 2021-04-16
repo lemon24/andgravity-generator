@@ -73,6 +73,8 @@ class Thingie:
         return self.get_page_metadata_and_content(id)[1]
 
     def get_page(self, id):
+        if not self.page_exists(id):
+            raise FileNotFoundError(os.path.join(self.path, id) + '.md')  # :(
         return Page(id, self)
 
     def get_children(
