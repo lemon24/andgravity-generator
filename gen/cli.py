@@ -101,6 +101,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
         ctx.call_on_close(cache.close)
 
         def node_cache_decorator(fn):
+            @functools.lru_cache
             @functools.wraps(fn)
             def wrapper(id):
                 key = f'{fn.__module__}.{fn.__qualname__}', id

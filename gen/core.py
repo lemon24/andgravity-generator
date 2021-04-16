@@ -1,5 +1,6 @@
 import os.path
 from dataclasses import dataclass
+from functools import cached_property
 
 
 @dataclass
@@ -59,11 +60,20 @@ class Thingie:
     def page_exists(self, id):
         return os.path.exists(os.path.join(self.path, id) + '.md')
 
-    def get_page(self, id):
+    def get_page_metadata_and_content(self, id):
         with open(os.path.join(self.path, id) + '.md') as f:
             metadata = load_metadata(f) or {}
             content = f.read()
-        return Page(id, content, metadata)
+        return metadata, content
+
+    def get_page_metadata(self, id):
+        return self.get_page_metadata_and_content(id)[0]
+
+    def get_page_content(self, id):
+        return self.get_page_metadata_and_content(id)[1]
+
+    def get_page(self, id):
+        return Page(id, self)
 
     def get_children(
         self,
@@ -97,11 +107,17 @@ class Thingie:
 @dataclass
 class Page:
     id: str
-    content: str
-    meta: dict
+    thingie: Thingie
 
-    # TODO: eager/lazy loading
     # TODO: required attributes
+
+    @cached_property
+    def meta(self):
+        return self.thingie.get_page_metadata(self.id)
+
+    @cached_property
+    def content(self):
+        return self.thingie.get_page_content(self.id)
 
     @property
     def title(self):
