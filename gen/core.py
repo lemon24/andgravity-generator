@@ -90,6 +90,9 @@ class Thingie:
                 continue
             yield child
 
+    def get_project_url(self):
+        return self.get_page('index').meta['project-url']
+
 
 @dataclass
 class Page:
@@ -97,7 +100,7 @@ class Page:
     content: str
     meta: dict
 
-    # TODO: eager loading
+    # TODO: eager/lazy loading
     # TODO: required attributes
 
     @property

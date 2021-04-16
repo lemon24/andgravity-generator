@@ -25,11 +25,11 @@ from flask import request
 from flask import Response
 from flask import send_from_directory
 from flask import url_for
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import NotFound
 from werkzeug.routing import BaseConverter
 
-from .core import Thingie
 from .markdown import make_markdown
+from .render import RenderThingie
 
 
 def build_url(url, text=None):
@@ -63,9 +63,14 @@ def build_url(url, text=None):
 def get_thingie():
     if hasattr(g, 'thingie'):
         return g.thingie
-    # TODO: get path from app config
-    g.thingie = Thingie(os.path.join(current_app.project_root, 'content'))
+    g.thingie = current_app.get_thingie()
     return g.thingie
+
+
+def render_node(id=None):
+    if id is None:
+        id = request.view_args['id']
+    return markupsafe.Markup(get_thingie().render_node(id))
 
 
 main_bp = Blueprint('main', __name__)
@@ -96,127 +101,48 @@ def page(id):
     return render_template(template, page=page)
 
 
-check_bp = Blueprint('check', __name__)
-
-warnings.filterwarnings(
-    'ignore', message='No parser was explicitly specified', module='gen.app'
-)
-
-
-def _get_page_fragments(id):
-    soup = get_soup(id)
-    rv = set()
-
-    for element in soup.select('[id], a[name]'):
-        if 'id' in element.attrs:
-            rv.add(element['id'])
-        if element.name == 'a' and 'name' in element.attrs:
-            rv.add(element['name'])
-
-    return rv
+@main_bp.route('/_file/<id>/<path:path>')
+def file(id, path):
+    # TODO: Thingie should tell us what the path to files is
+    return send_from_directory(
+        os.path.join(current_app.project_root, 'files'),
+        os.path.join(id, path),
+    )
 
 
-def match_app_url(url):
-    url_adapter = flask._request_ctx_stack.top.url_adapter
-    try:
-        return url_adapter.match(url)
-    except HTTPException as e:
+def build_file_url(url, text=None):
+    url_parsed = urlparse(url)
+    if url_parsed.scheme != 'attachment':
         return None
 
+    if url_parsed.hostname:
+        raise ValueError(f"attachment: does not support host yet, got {url!r}")
 
-def _get_internal_links(id):
-    soup = get_soup(id)
-    rv = {}
+    path = url_parsed.path.lstrip('/')
 
-    for anchor in soup.select('a[href]'):
-        url = anchor['href']
+    id = request.view_args['id']
 
-        if url in rv:
-            continue
+    if not text:
+        raise ValueError("attachment: getting text not supported yet")
 
-        url_parsed = urlparse(url)
-        if url_parsed.scheme not in ('http', 'https', ''):
-            continue
+    # TODO: disallow fragments, query string etc
 
-        if not url_parsed.hostname and not url_parsed.path:
-            url_parsed = url_parsed._replace(
-                path=urlparse(url_for('main.page', id=id)).path
-            )
-
-        match = match_app_url(url_parsed._replace(fragment='').geturl())
-        if not match:
-            continue
-
-        match_endpoint, match_args = match
-
-        rv[url] = (match_endpoint, match_args, url_parsed.fragment)
-
-    return rv
+    return url_for("main.file", id=id, path=path), text
 
 
-def _get_soup(id):
-    return bs4.BeautifulSoup(render_node(id))
+check_bp = Blueprint('check', __name__)
 
 
-def get_soup(id):
-    try:
-        fn = request.get_soup
-    except (RuntimeError, AttributeError):
-        fn = current_app.get_soup
-    return fn(id)
-
-
-@check_bp.route('/internal-urls.json')
-def internal_urls():
-    # TODO: also check attachments/images here?
-
-    thingie = get_thingie()
-
-    # if the app get_soup() is not cached, cache it, else use as-is;
-    # remove if this ends up using too much memory
-    if current_app.get_soup is _get_soup:
-        request.get_soup = functools.lru_cache(_get_soup)
-    else:
-        request.get_soup = current_app.get_soup
-
-    errors = {}
-    data = {}
-
-    for id in thingie.get_page_ids(hidden=None, discoverable=None):
-        data[id] = urls = {}
-
-        internal_links = current_app.get_internal_links(id)
-        for url, (endpoint, args, fragment) in internal_links.items():
-            if endpoint != 'main.page':
-                continue
-            target_id = args['id']
-
-            error = None
-
-            try:
-                thingie.get_page(target_id)
-            except FileNotFoundError:
-                error = "node not found"
-            else:
-                if fragment:
-                    fragments = current_app.get_page_fragments(target_id)
-                    if fragment not in fragments:
-                        error = "fragment not found"
-
-            urls[url] = {'error': error}
-            if error:
-                errors.setdefault(id, {})[url] = error
-
-    rv = {'errors': errors, 'data': data}
-
-    return rv
+@check_bp.route('/internal-links.json')
+def internal_links():
+    return dict(get_thingie().check_internal_links())
 
 
 feed_bp = Blueprint('feed', __name__)
 
 
 def abs_page_url_for(id):
-    return current_app.project_url + url_for('main.page', id=id)
+    return get_thingie().get_project_url().rstrip('/') + url_for('main.page', id=id)
 
 
 def abs_feed_url_for(id, tags=None):
@@ -224,7 +150,7 @@ def abs_feed_url_for(id, tags=None):
         url = url_for('feed.feed', id=id)
     else:
         url = url_for('feed.tag_feed', id=id, tags=tags)
-    return current_app.project_url + url
+    return get_thingie().get_project_url().rstrip('/') + url
 
 
 class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
@@ -327,38 +253,6 @@ def make_feed(thingie, id, tags=None):
     return fg
 
 
-file_bp = Blueprint('file', __name__)
-
-
-@file_bp.route('/<id>/<path:path>')
-def file(id, path):
-    # TODO: Thingie should tell us what the path to files is
-    return send_from_directory(
-        os.path.join(current_app.project_root, 'files'),
-        os.path.join(id, path),
-    )
-
-
-def build_file_url(url, text=None):
-    url_parsed = urlparse(url)
-    if url_parsed.scheme != 'attachment':
-        return None
-
-    if url_parsed.hostname:
-        raise ValueError(f"attachment: does not support host yet, got {url!r}")
-
-    path = url_parsed.path.lstrip('/')
-
-    id = request.view_args['id']
-
-    if not text:
-        raise ValueError("attachment: getting text not supported yet")
-
-    # TODO: disallow fragments, query string etc
-
-    return url_for("file.file", id=id, path=path), text
-
-
 class ListConverter(BaseConverter):
     def to_python(self, value):
         return value.split(',')
@@ -368,63 +262,60 @@ class ListConverter(BaseConverter):
         return ','.join(to_url(value) for value in values)
 
 
-def _render_node(id):
-    page = get_thingie().get_page(id)
-    url = url_for('main.page', id=id)
-    with current_app.test_request_context(url):
-        html = current_app.markdown(page.content)
-    return markupsafe.Markup(html)
+class Application(Flask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.markdown = make_markdown([build_url, build_file_url])
+        self.project_root = None
+        self.node_cache_decorator = None
 
+    def url_for_node(self, id):
+        ctx = self.test_request_context()
+        return ctx.url_adapter.build('main.page', dict(id=id))
 
-def render_node(id=None):
-    if id is None:
-        id = request.view_args['id']
-    # a level of indirection to allow caching stuff, maybe
-    return current_app.render_node(id)
+    def node_context(self, id):
+        url = self.url_for_node(id)
+        return self.test_request_context(url)
 
+    def match_url(self, *args, **kwargs):
+        ctx = self.test_request_context()
+        try:
+            return ctx.url_adapter.match(*args, **kwargs)
+        except NotFound as e:
+            return None
 
-NODE_FUNCTIONS = [_render_node, _get_internal_links, _get_page_fragments]
-EPHEMERAL_NODE_FUNCTIONS = [_get_soup]
-
-
-def _install_functions(app, functions, decorator=None):
-    for func in functions:
-        if decorator:
-            func = decorator(func)
-        setattr(app, func.__name__.lstrip('_'), func)
+    def get_thingie(self):
+        thingie = RenderThingie(os.path.join(self.project_root, 'content'), self)
+        if self.node_cache_decorator:
+            thingie.cache_node_methods(self.node_cache_decorator)
+        return thingie
 
 
 def create_app(
     project_root,
-    project_url,
     *,
     enable_checks=True,
     node_cache_decorator=None,
-    ephemeral_node_cache_decorator=None,
 ):
-    app = Flask(
+    # maybe use a custom constructor for this
+    app = Application(
         __name__,
         template_folder=os.path.join(project_root, 'templates'),
         static_url_path='/_static',
         static_folder=os.path.join(project_root, 'static'),
     )
+    # maybe use config for this
     app.project_root = project_root
-    app.project_url = project_url
+    app.node_cache_decorator = node_cache_decorator
+
     app.jinja_env.undefined = jinja2.StrictUndefined
     app.url_map.converters['list'] = ListConverter
 
     app.add_template_global(get_thingie)
-
-    app.markdown = make_markdown([build_url, build_file_url])
-
-    _install_functions(app, NODE_FUNCTIONS, node_cache_decorator)
-    _install_functions(app, EPHEMERAL_NODE_FUNCTIONS, ephemeral_node_cache_decorator)
-
     app.add_template_global(render_node)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
-    app.register_blueprint(file_bp, url_prefix='/_file')
 
     def enable_checks_fn():
         app.register_blueprint(check_bp, url_prefix='/_check')

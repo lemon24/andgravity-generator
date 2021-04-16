@@ -51,9 +51,9 @@ def make_freezer(app):
     def file():
         # only yield linked files
         for id in get_thingie().get_page_ids(discoverable=None):
-            for endpoint, args, _ in app.get_internal_links(id).values():
-                if endpoint == 'file.file':
-                    yield 'file.file', args
+            for link in get_thingie().get_internal_links(id).values():
+                if link.endpoint == 'main.file':
+                    yield 'main.file', link.args
 
     @freezer.register_generator
     def tag_feed():

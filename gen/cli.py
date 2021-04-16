@@ -10,8 +10,8 @@ import click
 import yaml
 
 import gen
-from .core import Thingie
 from .freeze import make_freezer
+from .render import RenderThingie
 
 
 @click.group()
@@ -88,8 +88,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
             raise click.Abort()
 
     content_root = os.path.join(project, 'content')
-    thingie = Thingie(content_root)
-    project_url = thingie.get_page('index').meta['project-url']
+    thingie = RenderThingie(content_root, None)
 
     # TODO: move the functions we're caching on an object that doesn't have anything to do with the app;
     # it's likely Thingie will already have a sqlite cache for metadata/tags (to make queries faster), reuse that
@@ -133,8 +132,6 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
         for id, path in thingie.get_page_paths():
             check_mtime(f'node:{id}', content_root, path)
 
-        print(new_mtimes)
-
         if new_mtimes:
             if any(key.startswith('dir:') for key in new_mtimes):
                 cache.clear(retry=True)
@@ -155,11 +152,8 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
 
     app = create_app(
         project,
-        project_url.rstrip('/'),
         enable_checks=False,
         node_cache_decorator=node_cache_decorator,
-        # TODO: this is not needed, loading the xml/html is very fast
-        ephemeral_node_cache_decorator=functools.lru_cache,
     )
 
     app.config['GEN_FREEZING'] = True
@@ -181,10 +175,14 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
         for url in urls:
             pass
 
-    app.enable_checks()
-    test_client = app.test_client()
+    errors = {}
+    for id, urls in app.get_thingie().check_internal_links():
+        id_errors = {
+            url: data['error'] for url, data in urls.items() if data.get('error')
+        }
+        if id_errors:
+            errors[id] = id_errors
 
-    errors = test_client.get('/_check/internal-urls.json').json['errors']
     if errors:
         errors_str = yaml.safe_dump(errors)
         raise click.ClickException(f"Broken internal URLs:\n\n{errors_str}\n")
