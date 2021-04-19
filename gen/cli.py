@@ -38,7 +38,7 @@ def serve(project, host, port, open):
 
     # TODO: threads, reload, debug
     url = f"http://{host}:{port}"
-    app = create_app(project, url)
+    app = create_app(project, project_url=url)
     open_fn = webbrowser.open if open else lambda url: None
     timer = threading.Timer(0.5, open_fn, (url,))
     try:
@@ -110,9 +110,12 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
         node_cache_decorator=node_cache_decorator,
     )
 
-    jinja_cache_path = os.path.join(project, '.gen/cache/jinja')
-    os.makedirs(jinja_cache_path, exist_ok=True)
-    app.jinja_env.bytecode_cache = FileSystemBytecodeCache(jinja_cache_path, '%s.cache')
+    if cache_option:
+        jinja_cache_path = os.path.join(project, '.gen/cache/jinja')
+        os.makedirs(jinja_cache_path, exist_ok=True)
+        app.jinja_env.bytecode_cache = FileSystemBytecodeCache(
+            jinja_cache_path, '%s.cache'
+        )
 
     app.config['GEN_FREEZING'] = True
 

@@ -138,11 +138,15 @@ def internal_links():
     return dict(get_thingie().check_internal_links())
 
 
+def get_project_url():
+    return current_app.project_url or get_thingie().get_project_url()
+
+
 feed_bp = Blueprint('feed', __name__)
 
 
 def abs_page_url_for(id):
-    return get_thingie().get_project_url().rstrip('/') + url_for('main.page', id=id)
+    return get_project_url().rstrip('/') + url_for('main.page', id=id)
 
 
 def abs_feed_url_for(id, tags=None):
@@ -150,7 +154,7 @@ def abs_feed_url_for(id, tags=None):
         url = url_for('feed.feed', id=id)
     else:
         url = url_for('feed.tag_feed', id=id, tags=tags)
-    return get_thingie().get_project_url().rstrip('/') + url
+    return get_project_url().rstrip('/') + url
 
 
 class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
@@ -265,8 +269,9 @@ class ListConverter(BaseConverter):
 class Application(Flask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.markdown = make_markdown([build_url, build_file_url])
         self.project_root = None
+        self.project_url = None
+        self.markdown = make_markdown([build_url, build_file_url])
         self.node_cache_decorator = None
 
     def url_for_node(self, id):
@@ -294,6 +299,7 @@ class Application(Flask):
 def create_app(
     project_root,
     *,
+    project_url=None,
     enable_checks=True,
     node_cache_decorator=None,
 ):
@@ -306,6 +312,7 @@ def create_app(
     )
     # maybe use config for this
     app.project_root = project_root
+    app.project_url = project_url
     app.node_cache_decorator = node_cache_decorator
 
     app.jinja_env.undefined = jinja2.StrictUndefined
