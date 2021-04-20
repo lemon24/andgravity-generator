@@ -34,9 +34,9 @@ class RenderThingie(Thingie):
         for name in self.cacheable_node_methods:
             setattr(self, name, cache_decorator(getattr(self, name)))
 
-    def render_node(self, id):
+    def render_node(self, id, **values):
         page = self.get_page(id)
-        with self.app.node_context(id):
+        with self.app.node_context(id, values=values):
             return self.app.markdown(page.content)
 
     def get_soup(self, id):

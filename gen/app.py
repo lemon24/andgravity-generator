@@ -42,22 +42,32 @@ def build_url(url, text=None):
 
     # TODO: disallow query strings, port etc
 
-    id = url_parsed.path.lstrip('/')
-    if not id:
+    path = url_parsed.path.lstrip('/')
+    if path:
+        id = path
+    else:
         id = request.view_args['id']
 
-    if url_parsed.path:
-        new_url = url_for("main.page", id=id)
-    else:
-        new_url = ''
-
+    kwargs = {}
     if url_parsed.fragment:
-        new_url = f"{new_url}#{url_parsed.fragment}"
+        kwargs['_anchor'] = url_parsed.fragment
+
+    new_url = url_for_node(id=id, **kwargs)
+    if not path:
+        new_url = urlparse(new_url)._replace(path='').geturl()
 
     if not text:
         text = id
 
     return new_url, text
+
+
+def url_for_node(id=None, **values):
+    if id is None:
+        id = request.view_args['id']
+    kwargs = dict(request.args)
+    kwargs.update(values)
+    return url_for('main.page', id=id, **kwargs)
 
 
 def get_thingie():
@@ -70,7 +80,7 @@ def get_thingie():
 def render_node(id=None):
     if id is None:
         id = request.view_args['id']
-    return markupsafe.Markup(get_thingie().render_node(id))
+    return markupsafe.Markup(get_thingie().render_node(id, **request.args))
 
 
 main_bp = Blueprint('main', __name__)
@@ -274,12 +284,12 @@ class Application(Flask):
         self.markdown = make_markdown([build_url, build_file_url])
         self.node_cache_decorator = None
 
-    def url_for_node(self, id):
-        ctx = self.test_request_context()
-        return ctx.url_adapter.build('main.page', dict(id=id))
+    def url_for_node(self, id, **values):
+        with self.test_request_context():
+            return url_for('main.page', id=id, **values)
 
-    def node_context(self, id):
-        url = self.url_for_node(id)
+    def node_context(self, id, values=None):
+        url = self.url_for_node(id, **(values or {}))
         return self.test_request_context(url)
 
     def match_url(self, *args, **kwargs):
@@ -320,6 +330,7 @@ def create_app(
 
     app.add_template_global(get_thingie)
     app.add_template_global(render_node)
+    app.add_template_global(url_for_node)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')

@@ -16,4 +16,4 @@ else:
     print('no', os.environ.get('WERKZEUG_SERVER_FD', ''))
     project_url = ''
 
-app = create_app(os.environ['GEN_PROJECT_ROOT'], project_url)
+app = create_app(os.environ['GEN_PROJECT_ROOT'], project_url=project_url)
