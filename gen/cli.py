@@ -1,3 +1,4 @@
+import contextlib
 import functools
 import json
 import os.path
@@ -65,9 +66,10 @@ def serve(project, host, port, open):
     help="If OUTDIR is a git repo, add all changed, commit, and push.",
 )
 @click.option('--cache/--no-cache', 'cache_option')
+@click.option('-v', '--verbose', count=True)
 @click.pass_obj
 @click.pass_context
-def freeze(ctx, project, outdir, force, deploy, cache_option):
+def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
     stdout_isatty = click.get_text_stream('stdout').isatty()
     confirm_overwrite = os.path.exists(outdir) and not force
 
@@ -90,13 +92,17 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
     content_root = os.path.join(project, 'content')
     thingie = RenderThingie(content_root, None)
 
+    def log(*args):
+        if verbose:
+            click.echo(' '.join(map(str, args)))
+
     if cache_option:
         import diskcache
 
         cache = diskcache.Cache(os.path.join(project, '.gen/cache/data'))
         ctx.call_on_close(cache.close)
         invalidate_cache(project, thingie, cache)
-        node_cache_decorator = make_node_cache_decorator(cache)
+        node_cache_decorator = make_node_cache_decorator(cache, log)
 
     else:
         node_cache_decorator = functools.lru_cache
@@ -127,14 +133,18 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
 
     freezer = make_freezer(app)
 
-    progressbar = click.progressbar(
-        freezer.freeze_yield(),
-        item_show_func=lambda p: p.url if p else 'Done!',
-        show_pos=True,
-    )
-    with progressbar as urls:
-        for url in urls:
-            pass
+    rv = freezer.freeze_yield()
+    if not verbose:
+        progressbar = click.progressbar(
+            rv,
+            item_show_func=lambda p: p.url if p else 'Done!',
+            show_pos=True,
+        )
+    else:
+        progressbar = contextlib.nullcontext(rv)
+    with progressbar as pages:
+        for page in pages:
+            log('done', page.path)
 
     errors = {}
     for id, urls in app.get_thingie().check_internal_links():
@@ -175,7 +185,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option):
         subprocess.run(['git', '-C', outdir, 'push'])
 
 
-def make_node_cache_decorator(cache):
+def make_node_cache_decorator(cache, log):
     def node_cache_decorator(fn):
         @functools.lru_cache
         @functools.wraps(fn)
@@ -184,7 +194,10 @@ def make_node_cache_decorator(cache):
 
             rv = cache.get(key)
             if rv is not None:
+                log('hit ', *key)
                 return rv
+
+            log('miss', *key)
 
             rv = fn(id)
             cache.set(key, rv, tag=f'node:{id}')
