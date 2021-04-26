@@ -26,8 +26,8 @@ class RenderThingie(Thingie):
         'render_node',
         'get_fragments',
         'get_internal_links',
-        'get_page_metadata_and_content',
-        # presumably, we could cache get_page_metadata and get_page_content as well, but it doesn't do much
+        'get_page_metadata',
+        'get_page_content',
     ]
 
     def cache_node_methods(self, cache_decorator):

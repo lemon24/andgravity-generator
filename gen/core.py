@@ -2,6 +2,8 @@ import os.path
 from dataclasses import dataclass
 from functools import cached_property
 
+import yaml
+
 
 @dataclass
 class Thingie:
@@ -67,17 +69,21 @@ class Thingie:
     def page_exists(self, id):
         return os.path.exists(os.path.join(self.path, id) + '.md')
 
-    def get_page_metadata_and_content(self, id):
-        with open(os.path.join(self.path, id) + '.md') as f:
-            metadata = load_metadata(f) or {}
-            content = f.read()
-        return metadata, content
-
     def get_page_metadata(self, id):
-        return self.get_page_metadata_and_content(id)[0]
+        with open(os.path.join(self.path, id) + '.md') as f:
+            lines = list(read_metadata(f))
+        rv = yaml.safe_load(''.join(lines)) or {}
+        if not isinstance(rv, dict):
+            raise ValueError(
+                f"bad metadata (expected dict, got {type(rv).__name__}): {id}"
+            )
+        return rv
 
     def get_page_content(self, id):
-        return self.get_page_metadata_and_content(id)[1]
+        with open(os.path.join(self.path, id) + '.md') as f:
+            for line in read_metadata(f):
+                pass
+            return f.read()
 
     def get_page(self, id):
         if not self.page_exists(id):
@@ -181,29 +187,22 @@ class Page:
         return bool(self.meta.get('discoverable', True))
 
 
-import yaml
-
-
-def load_metadata(file):
+def read_metadata(file):
     initial_offset = file.tell()
 
     try:
         line = next(file)
     except StopIteration:
-        return None
+        return
 
     if not line.rstrip() == '---':
         file.seek(initial_offset)
-        return None
+        return
 
-    lines = [line]
     for line in file:
-        lines.append(line)
         if line.rstrip() == '---':
             break
-
-    try:
-        return yaml.safe_load(''.join(lines[:-1]))
-    except:
+        yield line
+    else:
         file.seek(initial_offset)
-        raise
+        raise ValueError("could not find end metadata marker")

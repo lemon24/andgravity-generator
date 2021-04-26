@@ -1,24 +1,23 @@
 import io
 
 import pytest
-import yaml
 
-from gen.core import load_metadata
+from gen.core import read_metadata
 
 
-def test_load_metadata():
+def test_read_metadata():
 
     f = io.StringIO("one\n---\ntwo\n")
-    m = load_metadata(f)
-    assert m is None
+    m = list(read_metadata(f))
+    assert m == []
     assert f.read() == "one\n---\ntwo\n"
 
     f = io.StringIO("---\none\n---\ntwo\n")
-    m = load_metadata(f)
-    assert m == 'one'
+    m = list(read_metadata(f))
+    assert m == ['one\n']
     assert f.read() == "two\n"
 
-    f = io.StringIO("---\n[one\n---\ntwo\n")
-    with pytest.raises(yaml.YAMLError):
-        load_metadata(f)
-    assert f.read() == "---\n[one\n---\ntwo\n"
+    f = io.StringIO("---\none\n")
+    with pytest.raises(ValueError):
+        list(read_metadata(f))
+    assert f.read() == "---\none\n"
