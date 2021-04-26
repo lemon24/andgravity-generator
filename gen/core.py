@@ -18,43 +18,50 @@ class Thingie:
                 continue
             yield name, entry.name
 
+    def get_all_page_ids(self):
+        for name, _ in self.get_page_paths():
+            yield name
+
     def get_pages(
-        self, *, hidden=False, discoverable=True, tags=None, sort='id', reverse=False
+        self,
+        *,
+        hidden=False,
+        discoverable=True,
+        tags=None,
+        invert=False,
+        sort='id',
+        reverse=False,
     ):
-        def generate():
-            for name, _ in self.get_page_paths():
-                page = self.get_page(name)
-                meta = page.meta
+        filters = []
+        if hidden is not None:
+            filters.append(lambda p: p.hidden is bool(hidden))
+        if discoverable is not None:
+            filters.append(lambda p: p.discoverable is bool(discoverable))
+        if tags is not None:
+            filters.append(lambda p: any(tag in p.tags for tag in tags))
+        if sort != 'id':
+            filters.append(lambda p: sort in p.meta)
 
-                if hidden is not None:
-                    # TODO: hidden pages will still be generated if someone links them explicitly
-                    if bool(meta.get('hidden', False)) is not bool(hidden):
-                        continue
+        keep = lambda p: invert is not all(f(p) for f in filters)
 
-                if discoverable is not None:
-                    if bool(meta.get('discoverable', True)) is not bool(discoverable):
-                        continue
+        rv = filter(keep, map(self.get_page, self.get_all_page_ids()))
 
-                if tags is not None:
-                    if not any(tag in page.tags for tag in tags):
-                        continue
-
-                yield page
-
-        rv = generate()
-        if sort == 'id':
-            rv = sorted(rv, key=lambda p: p.id, reverse=reverse)
-        elif sort == 'published':
-            rv = (p for p in rv if 'published' in p.meta)
-            rv = sorted(rv, key=lambda p: p.meta['published'], reverse=reverse)
+        if sort == 'id' or invert:
+            key = lambda p: p.id
         else:
-            raise ValueError(f"unknown sort: {sort!r}")
+            if sort not in ('published',):
+                raise ValueError(f"unknown sort: {sort!r}")
+            key = lambda p: p.meta[sort]
+
+        rv = sorted(rv, key=key, reverse=reverse)
 
         return iter(rv)
 
-    def get_page_ids(self, *, hidden=False, discoverable=True, tags=None):
+    def get_page_ids(self, *, hidden=False, discoverable=True, tags=None, invert=False):
         # TODO: this is inefficient
-        for page in self.get_pages(hidden=hidden, discoverable=discoverable, tags=tags):
+        for page in self.get_pages(
+            hidden=hidden, discoverable=discoverable, tags=tags, invert=invert
+        ):
             yield page.id
 
     def page_exists(self, id):
@@ -86,6 +93,7 @@ class Thingie:
         hidden=False,
         discoverable=True,
         tags=None,
+        invert=False,
     ):
         if id != 'index':
             return
@@ -96,6 +104,7 @@ class Thingie:
             tags=tags,
             sort=sort,
             reverse=reverse,
+            invert=invert,
         )
         for child in children:
             if child.id == 'index':
@@ -162,6 +171,14 @@ class Page:
     @property
     def series(self):
         return [tag for tag in self.tags if tag.startswith('series-')]
+
+    @property
+    def hidden(self) -> bool:
+        return bool(self.meta.get('hidden', False))
+
+    @property
+    def discoverable(self) -> bool:
+        return bool(self.meta.get('discoverable', True))
 
 
 import yaml
