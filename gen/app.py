@@ -15,6 +15,7 @@ import jinja2
 import markupsafe
 import readtime
 import soupsieve.util
+import yaml
 from flask import abort
 from flask import Blueprint
 from flask import current_app
@@ -331,6 +332,8 @@ def create_app(
     app.add_template_global(get_thingie)
     app.add_template_global(render_node)
     app.add_template_global(url_for_node)
+
+    app.add_template_filter(yaml.safe_dump, 'to_yaml')
 
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
