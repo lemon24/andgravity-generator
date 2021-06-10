@@ -95,6 +95,9 @@ class RenderThingie(Thingie):
 
                 error = None
 
+                if link.fragment == 'embedded-subscribe-form':
+                    continue
+
                 try:
                     self.get_page(target_id)
                 except FileNotFoundError:
