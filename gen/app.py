@@ -262,7 +262,9 @@ def make_feed(thingie, id, tags=None):
         fe.updated(child.meta.get('updated', child.meta['published']))  # required
         fe.published(child.meta['published'])
 
-        # TODO: summary feature
+        if child.summary:
+            fe.summary(child.summary)
+
         fe.content(content=render_node(child.id), type='html')
 
     return fg

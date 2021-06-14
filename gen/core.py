@@ -126,7 +126,7 @@ class Page:
     id: str
     thingie: Thingie
 
-    # TODO: required attributes
+    # TODO: required attributes, schema
 
     @cached_property
     def meta(self):
@@ -139,6 +139,10 @@ class Page:
     @property
     def title(self):
         return self.meta.get('title', self.id)
+
+    @property
+    def summary(self):
+        return self.meta.get('summary')
 
     @property
     def tags(self):

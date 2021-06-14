@@ -5,6 +5,8 @@ tags: [first-tag]
 author:
   name: local
   email: local@example.com
+summary: <b>plain text</b> summary
+
 ---
 
 [label](node:two)

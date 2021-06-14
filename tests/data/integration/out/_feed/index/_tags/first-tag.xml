@@ -32,6 +32,7 @@
 &lt;p&gt;&lt;a href=""&gt;one&lt;/a&gt;&lt;/p&gt;
 </content>
     <link href="https://example.com/one" rel="alternate"/>
+    <summary>&lt;b&gt;plain text&lt;/b&gt; summary</summary>
     <published>2021-01-01T00:00:00+00:00</published>
   </entry>
 </feed>
