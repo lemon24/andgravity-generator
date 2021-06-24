@@ -11,8 +11,9 @@ import click
 import yaml
 
 import gen
+from .checks import LinkChecker
+from .core import Thingie
 from .freeze import make_freezer
-from .render import RenderThingie
 
 
 @click.group()
@@ -90,7 +91,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
             raise click.Abort()
 
     content_root = os.path.join(project, 'content')
-    thingie = RenderThingie(content_root, None)
+    thingie = Thingie(content_root)
 
     def log(*args):
         if verbose:
@@ -147,7 +148,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
             log('done', page.path)
 
     errors = {}
-    for id, urls in app.get_thingie().check_internal_links():
+    for id, urls in app.link_checker.check_internal_links():
         id_errors = {
             url: data['error'] for url, data in urls.items() if data.get('error')
         }

@@ -51,7 +51,7 @@ def make_freezer(app):
     def file():
         # only yield linked files
         for id in get_thingie().get_page_ids(discoverable=None):
-            for link in get_thingie().get_internal_links(id).values():
+            for link in app.link_checker.get_internal_links(id).values():
                 if link.endpoint == 'main.file':
                     yield 'main.file', link.args
 

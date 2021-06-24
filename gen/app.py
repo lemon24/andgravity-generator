@@ -29,8 +29,9 @@ from flask import url_for
 from werkzeug.exceptions import NotFound
 from werkzeug.routing import BaseConverter
 
+from .checks import LinkChecker
+from .core import Thingie
 from .markdown import make_markdown
-from .render import RenderThingie
 
 
 def build_url(url, text=None):
@@ -72,16 +73,15 @@ def url_for_node(id=None, **values):
 
 
 def get_thingie():
-    if hasattr(g, 'thingie'):
-        return g.thingie
-    g.thingie = current_app.get_thingie()
-    return g.thingie
+    # indirecting, in case we ever want it to be per-thread
+    return current_app.thingie
 
 
 def render_node(id=None):
     if id is None:
         id = request.view_args['id']
-    return markupsafe.Markup(get_thingie().render_node(id, **request.args))
+    # TODO: why not return Markup from app.render_node?
+    return markupsafe.Markup(current_app.render_node(id, **request.args))
 
 
 main_bp = Blueprint('main', __name__)
@@ -146,7 +146,8 @@ check_bp = Blueprint('check', __name__)
 
 @check_bp.route('/internal-links.json')
 def internal_links():
-    return dict(get_thingie().check_internal_links())
+    # TODO: instantiate and cache link checker here, maybe
+    return dict(current_app.link_checker.check_internal_links())
 
 
 def get_project_url():
@@ -284,8 +285,9 @@ class Application(Flask):
         super().__init__(*args, **kwargs)
         self.project_root = None
         self.project_url = None
+        self.thingie = None
+        self.link_checker = None
         self.markdown = make_markdown([build_url, build_file_url])
-        self.node_cache_decorator = None
 
     def url_for_node(self, id, **values):
         with self.test_request_context():
@@ -302,11 +304,11 @@ class Application(Flask):
         except NotFound as e:
             return None
 
-    def get_thingie(self):
-        thingie = RenderThingie(os.path.join(self.project_root, 'content'), self)
-        if self.node_cache_decorator:
-            thingie.cache_node_methods(self.node_cache_decorator)
-        return thingie
+    # This is here because we need a method to cache.
+    def render_node(self, id, **values):
+        page = self.thingie.get_page(id)
+        with self.node_context(id, values=values):
+            return self.markdown(page.content)
 
 
 def create_app(
@@ -326,7 +328,22 @@ def create_app(
     # maybe use config for this
     app.project_root = project_root
     app.project_url = project_url
-    app.node_cache_decorator = node_cache_decorator
+
+    if node_cache_decorator:
+        app.render_node = node_cache_decorator(app.render_node)
+
+    # don't need to have one per thread (not with this implementation)
+    app.thingie = thingie = Thingie(os.path.join(project_root, 'content'))
+    if node_cache_decorator:
+        thingie.get_page_metadata = node_cache_decorator(thingie.get_page_metadata)
+        thingie.get_page_content = node_cache_decorator(thingie.get_page_content)
+
+    app.link_checker = link_checker = LinkChecker(app)
+    if node_cache_decorator:
+        link_checker.get_fragments = node_cache_decorator(link_checker.get_fragments)
+        link_checker.get_internal_links = node_cache_decorator(
+            link_checker.get_internal_links
+        )
 
     app.jinja_env.undefined = jinja2.StrictUndefined
     app.url_map.converters['list'] = ListConverter
@@ -340,11 +357,7 @@ def create_app(
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
 
-    def enable_checks_fn():
-        app.register_blueprint(check_bp, url_prefix='/_check')
-
-    app.enable_checks = enable_checks_fn
     if enable_checks:
-        app.enable_checks()
+        app.register_blueprint(check_bp, url_prefix='/_check')
 
     return app

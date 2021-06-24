@@ -8,7 +8,7 @@ import bs4
 from .core import Thingie
 
 warnings.filterwarnings(
-    'ignore', message='No parser was explicitly specified', module='gen.render'
+    'ignore', message='No parser was explicitly specified', module='gen.checks'
 )
 
 
@@ -18,29 +18,19 @@ class InternalLink(NamedTuple):
     fragment: str
 
 
+"""
+def cache_node_methods(self, cache_decorator):
+    for name in self.cacheable_node_methods:
+        setattr(self, name, cache_decorator(getattr(self, name)))
+"""
+
+
 @dataclass
-class RenderThingie(Thingie):
+class LinkChecker:
     app: 'gen.app.Application'
 
-    cacheable_node_methods = [
-        'render_node',
-        'get_fragments',
-        'get_internal_links',
-        'get_page_metadata',
-        'get_page_content',
-    ]
-
-    def cache_node_methods(self, cache_decorator):
-        for name in self.cacheable_node_methods:
-            setattr(self, name, cache_decorator(getattr(self, name)))
-
-    def render_node(self, id, **values):
-        page = self.get_page(id)
-        with self.app.node_context(id, values=values):
-            return self.app.markdown(page.content)
-
     def get_soup(self, id):
-        return bs4.BeautifulSoup(self.render_node(id))
+        return bs4.BeautifulSoup(self.app.render_node(id))
 
     def get_fragments(self, id):
         soup = self.get_soup(id)
@@ -82,7 +72,7 @@ class RenderThingie(Thingie):
         return rv
 
     def check_internal_links(self):
-        for id in self.get_page_ids(hidden=None, discoverable=None):
+        for id in self.app.thingie.get_page_ids(hidden=None, discoverable=None):
             internal_links = self.get_internal_links(id)
             urls = {}
 
@@ -99,7 +89,7 @@ class RenderThingie(Thingie):
                     continue
 
                 try:
-                    self.get_page(target_id)
+                    self.app.thingie.get_page(target_id)
                 except FileNotFoundError:
                     error = "node not found"
                 else:
