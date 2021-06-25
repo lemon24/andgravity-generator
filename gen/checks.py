@@ -30,7 +30,7 @@ class LinkChecker:
     state: 'gen.app._NodeState'
 
     def get_soup(self, id):
-        return bs4.BeautifulSoup(self.state.render_node(id))
+        return bs4.BeautifulSoup(self.state.render_page(id))
 
     def get_fragments(self, id):
         soup = self.get_soup(id)
@@ -84,9 +84,6 @@ class LinkChecker:
                 target_id = link.args['id']
 
                 error = None
-
-                if link.fragment == 'embedded-subscribe-form':
-                    continue
 
                 try:
                     self.state.thingie.get_page(target_id)

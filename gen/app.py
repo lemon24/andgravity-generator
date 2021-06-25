@@ -366,6 +366,12 @@ class _NodeState:
         url = self.url_for_node(id, **(values or {}))
         return self._app.test_request_context(url)
 
+    def render_page(self, id):
+        with self._app.test_client() as client:
+            rv = client.get(self.url_for_node(id))
+            assert rv.status_code == 200, rv.status
+            return rv.get_data(as_text=True)
+
     def url_for_node(self, id, **values):
         with self._app.test_request_context():
             return url_for_node(id, **values)
