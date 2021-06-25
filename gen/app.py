@@ -3,6 +3,8 @@ import ntpath
 import os.path
 import warnings
 from contextlib import nullcontext
+from dataclasses import dataclass
+from dataclasses import field
 from itertools import chain
 from urllib.parse import urlparse
 
@@ -34,36 +36,33 @@ from .core import Thingie
 from .markdown import make_markdown
 
 
-def build_url(url, text=None):
-    url_parsed = urlparse(url)
-    if url_parsed.scheme not in ('node', ''):
-        return None
+# BEGIN main blueprint
 
-    if url_parsed.hostname:
-        raise ValueError(f"node: does not support host yet, got {url!r}")
 
-    # TODO: disallow query strings, port etc
+main_bp = Blueprint('main', __name__)
 
-    path = url_parsed.path.lstrip('/')
-    if path:
-        id = path
-    else:
+
+# various helpers, mostly related to the node state
+
+
+def get_state():
+    return current_app.extensions['state']
+
+
+@main_bp.app_template_global()
+def get_thingie():
+    # for convenience
+    return get_state().thingie
+
+
+@main_bp.app_template_global()
+def render_node(id=None):
+    if id is None:
         id = request.view_args['id']
-
-    kwargs = {}
-    if url_parsed.fragment:
-        kwargs['_anchor'] = url_parsed.fragment
-
-    new_url = url_for_node(id=id, **kwargs)
-    if not path:
-        new_url = urlparse(new_url)._replace(path='').geturl()
-
-    if not text:
-        text = id
-
-    return new_url, text
+    return get_state().render_node(id, **request.args)
 
 
+@main_bp.app_template_global()
 def url_for_node(id=None, **values):
     if id is None:
         id = request.view_args['id']
@@ -72,29 +71,12 @@ def url_for_node(id=None, **values):
     return url_for('main.page', id=id, **kwargs)
 
 
-def get_thingie():
-    # indirecting, in case we ever want it to be per-thread
-    return current_app.thingie
+def get_project_url():
+    return current_app.config.get('PROJECT_URL') or get_thingie().get_project_url()
 
 
-def render_node(id=None):
-    if id is None:
-        id = request.view_args['id']
-    # TODO: why not return Markup from app.render_node?
-    return markupsafe.Markup(current_app.render_node(id, **request.args))
-
-
-main_bp = Blueprint('main', __name__)
-
-
-@main_bp.app_template_filter('readtime_minutes')
-def readtime_minutes_filter(html):
-    return readtime.of_html(html).minutes
-
-
-@main_bp.app_template_filter('humanize_apnumber')
-def humanize_apnumber_filter(value):
-    return humanize.apnumber(value)
+def abs_page_url_for(id):
+    return get_project_url().rstrip('/') + url_for('main.page', id=id)
 
 
 @main_bp.route('/', defaults={'id': 'index'})
@@ -114,65 +96,29 @@ def page(id):
 
 @main_bp.route('/_file/<id>/<path:path>')
 def file(id, path):
-    # TODO: Thingie should tell us what the path to files is
     return send_from_directory(
-        os.path.join(current_app.project_root, 'files'),
+        os.path.join(current_app.config['PROJECT_ROOT'], 'files'),
         os.path.join(id, path),
     )
 
 
-def build_file_url(url, text=None):
-    url_parsed = urlparse(url)
-    if url_parsed.scheme != 'attachment':
-        return None
-
-    if url_parsed.hostname:
-        raise ValueError(f"attachment: does not support host yet, got {url!r}")
-
-    path = url_parsed.path.lstrip('/')
-
-    id = request.view_args['id']
-
-    if not text:
-        raise ValueError("attachment: getting text not supported yet")
-
-    # TODO: disallow fragments, query string etc
-
-    return url_for("main.file", id=id, path=path), text
+@main_bp.app_template_filter('readtime_minutes')
+def readtime_minutes_filter(html):
+    return readtime.of_html(html).minutes
 
 
-check_bp = Blueprint('check', __name__)
+@main_bp.app_template_filter('humanize_apnumber')
+def humanize_apnumber_filter(value):
+    return humanize.apnumber(value)
 
 
-@check_bp.route('/internal-links.json')
-def internal_links():
-    # TODO: instantiate and cache link checker here, maybe
-    return dict(current_app.link_checker.check_internal_links())
+main_bp.add_app_template_filter(yaml.safe_dump, 'to_yaml')
 
 
-def get_project_url():
-    return current_app.project_url or get_thingie().get_project_url()
+# BEGIN feed blueprint
 
 
 feed_bp = Blueprint('feed', __name__)
-
-
-def abs_page_url_for(id):
-    return get_project_url().rstrip('/') + url_for('main.page', id=id)
-
-
-def abs_feed_url_for(id, tags=None):
-    if not tags:
-        url = url_for('feed.feed', id=id)
-    else:
-        url = url_for('feed.tag_feed', id=id, tags=tags)
-    return get_project_url().rstrip('/') + url
-
-
-class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
-    def extend_atom(self, entry):
-        entry.base = entry.find("./link[@rel='alternate']").attrib['href']
-        return entry
 
 
 @feed_bp.route('/<id>.xml')
@@ -271,6 +217,170 @@ def make_feed(thingie, id, tags=None):
     return fg
 
 
+def abs_feed_url_for(id, tags=None):
+    if not tags:
+        url = url_for('feed.feed', id=id)
+    else:
+        url = url_for('feed.tag_feed', id=id, tags=tags)
+    return get_project_url().rstrip('/') + url
+
+
+class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
+    def extend_atom(self, entry):
+        entry.base = entry.find("./link[@rel='alternate']").attrib['href']
+        return entry
+
+
+# BEGIN check blueprint
+
+
+check_bp = Blueprint('check', __name__)
+
+
+@check_bp.route('/internal-links.json')
+def internal_links():
+    # TODO: instantiate and cache link checker here, maybe
+    return dict(get_state().link_checker.check_internal_links())
+
+
+# BEGIN markdown
+
+
+def build_page_url(url, text=None):
+    """Markdown schema-less URL -> web app page URL."""
+    url_parsed = urlparse(url)
+    if url_parsed.scheme not in ('node', ''):
+        return None
+
+    if url_parsed.hostname:
+        raise ValueError(f"node: does not support host yet, got {url!r}")
+
+    # TODO: disallow query strings, port etc
+
+    path = url_parsed.path.lstrip('/')
+    if path:
+        id = path
+    else:
+        id = request.view_args['id']
+
+    kwargs = {}
+    if url_parsed.fragment:
+        kwargs['_anchor'] = url_parsed.fragment
+
+    new_url = url_for_node(id=id, **kwargs)
+    if not path:
+        new_url = urlparse(new_url)._replace(path='').geturl()
+
+    if not text:
+        text = id
+
+    return new_url, text
+
+
+def build_file_url(url, text=None):
+    """Markdown attachment: URL -> web app file URL."""
+
+    # TODO: maybe use file: instead?
+
+    url_parsed = urlparse(url)
+    if url_parsed.scheme != 'attachment':
+        return None
+
+    if url_parsed.hostname:
+        raise ValueError(f"attachment: does not support host yet, got {url!r}")
+
+    path = url_parsed.path.lstrip('/')
+
+    id = request.view_args['id']
+
+    if not text:
+        raise ValueError("attachment: getting text not supported yet")
+
+    # TODO: disallow fragments, query string etc
+
+    return url_for("main.file", id=id, path=path), text
+
+
+# For now, we're OK with a global, non-configurable markdown instance.
+
+markdown = make_markdown([build_page_url, build_file_url])
+
+
+# BEGIN node state
+
+
+def init_node_state(app, node_cache_decorator=None):
+    """Store node-related state on the app.
+
+    Implemented as a Flask extension, to avoid subclassing /
+    setting attributes directly on the Flask instance.
+
+    """
+    project_root = app.config['PROJECT_ROOT']
+
+    thingie = Thingie(os.path.join(project_root, 'content'))
+    if node_cache_decorator:
+        thingie.get_page_metadata = node_cache_decorator(thingie.get_page_metadata)
+        thingie.get_page_content = node_cache_decorator(thingie.get_page_content)
+
+    state = _NodeState(app, thingie)
+    if node_cache_decorator:
+        state.render_node = node_cache_decorator(state.render_node)
+
+    state.link_checker = link_checker = LinkChecker(state)
+    if node_cache_decorator:
+        link_checker.get_fragments = node_cache_decorator(link_checker.get_fragments)
+        link_checker.get_internal_links = node_cache_decorator(
+            link_checker.get_internal_links
+        )
+
+    app.extensions['state'] = state
+
+
+@dataclass
+class _NodeState:
+    """Node-related state for an app.
+
+    Provides cacheable methods, without having to directly expose the whole app.
+
+    The circular dependency between the app and this state is probably OK.
+    This exists to limit the API others (e.g. LinkChecker) should depend on.
+
+    For now, it's OK to have one of everything per thread.
+    If we change our mind, we can make the various attributes
+    properties that set/return state from g.
+
+    """
+
+    _app: Flask
+    thingie: Thingie
+    link_checker: LinkChecker = field(init=False)
+
+    def render_node(self, id, **values):
+        # This is here because we need a method to cache.
+        page = self.thingie.get_page(id)
+        with self._node_context(id, values=values):
+            return markupsafe.Markup(markdown(page.content))
+
+    def _node_context(self, id, values=None):
+        url = self.url_for_node(id, **(values or {}))
+        return self._app.test_request_context(url)
+
+    def url_for_node(self, id, **values):
+        with self._app.test_request_context():
+            return url_for_node(id, **values)
+
+    def match_url(self, *args, **kwargs):
+        ctx = self._app.test_request_context()
+        try:
+            return ctx.url_adapter.match(*args, **kwargs)
+        except NotFound as e:
+            return None
+
+
+# BEGIN app creation
+
+
 class ListConverter(BaseConverter):
     def to_python(self, value):
         return value.split(',')
@@ -280,37 +390,6 @@ class ListConverter(BaseConverter):
         return ','.join(to_url(value) for value in values)
 
 
-class Application(Flask):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.project_root = None
-        self.project_url = None
-        self.thingie = None
-        self.link_checker = None
-        self.markdown = make_markdown([build_url, build_file_url])
-
-    def url_for_node(self, id, **values):
-        with self.test_request_context():
-            return url_for('main.page', id=id, **values)
-
-    def node_context(self, id, values=None):
-        url = self.url_for_node(id, **(values or {}))
-        return self.test_request_context(url)
-
-    def match_url(self, *args, **kwargs):
-        ctx = self.test_request_context()
-        try:
-            return ctx.url_adapter.match(*args, **kwargs)
-        except NotFound as e:
-            return None
-
-    # This is here because we need a method to cache.
-    def render_node(self, id, **values):
-        page = self.thingie.get_page(id)
-        with self.node_context(id, values=values):
-            return self.markdown(page.content)
-
-
 def create_app(
     project_root,
     *,
@@ -318,46 +397,26 @@ def create_app(
     enable_checks=True,
     node_cache_decorator=None,
 ):
-    # maybe use a custom constructor for this
-    app = Application(
+    app = Flask(
         __name__,
         template_folder=os.path.join(project_root, 'templates'),
         static_url_path='/_static',
         static_folder=os.path.join(project_root, 'static'),
     )
-    # maybe use config for this
-    app.project_root = project_root
-    app.project_url = project_url
 
-    if node_cache_decorator:
-        app.render_node = node_cache_decorator(app.render_node)
-
-    # don't need to have one per thread (not with this implementation)
-    app.thingie = thingie = Thingie(os.path.join(project_root, 'content'))
-    if node_cache_decorator:
-        thingie.get_page_metadata = node_cache_decorator(thingie.get_page_metadata)
-        thingie.get_page_content = node_cache_decorator(thingie.get_page_content)
-
-    app.link_checker = link_checker = LinkChecker(app)
-    if node_cache_decorator:
-        link_checker.get_fragments = node_cache_decorator(link_checker.get_fragments)
-        link_checker.get_internal_links = node_cache_decorator(
-            link_checker.get_internal_links
-        )
+    app.config['PROJECT_ROOT'] = project_root
+    if project_url:
+        app.config['PROJECT_URL'] = project_url
 
     app.jinja_env.undefined = jinja2.StrictUndefined
     app.url_map.converters['list'] = ListConverter
-
-    app.add_template_global(get_thingie)
-    app.add_template_global(render_node)
-    app.add_template_global(url_for_node)
-
-    app.add_template_filter(yaml.safe_dump, 'to_yaml')
 
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
 
     if enable_checks:
         app.register_blueprint(check_bp, url_prefix='/_check')
+
+    init_node_state(app, node_cache_decorator)
 
     return app

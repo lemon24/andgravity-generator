@@ -1,6 +1,7 @@
 import os.path
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from gen.cli import cli
@@ -50,6 +51,7 @@ one:
 """
 
 
+@pytest.mark.filterwarnings('ignore:Nothing frozen')
 def test_freeze_broken_links(tmp_path, subtests):
     input_dir = ROOT.joinpath('data/integration-broken-links/in')
     output_dir = tmp_path.joinpath('out')

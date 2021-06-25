@@ -27,10 +27,10 @@ def cache_node_methods(self, cache_decorator):
 
 @dataclass
 class LinkChecker:
-    app: 'gen.app.Application'
+    state: 'gen.app._NodeState'
 
     def get_soup(self, id):
-        return bs4.BeautifulSoup(self.app.render_node(id))
+        return bs4.BeautifulSoup(self.state.render_node(id))
 
     def get_fragments(self, id):
         soup = self.get_soup(id)
@@ -60,10 +60,10 @@ class LinkChecker:
 
             if not url_parsed.hostname and not url_parsed.path:
                 url_parsed = url_parsed._replace(
-                    path=urlparse(self.app.url_for_node(id)).path
+                    path=urlparse(self.state.url_for_node(id)).path
                 )
 
-            match = self.app.match_url(url_parsed._replace(fragment='').geturl())
+            match = self.state.match_url(url_parsed._replace(fragment='').geturl())
             if not match:
                 continue
 
@@ -72,7 +72,7 @@ class LinkChecker:
         return rv
 
     def check_internal_links(self):
-        for id in self.app.thingie.get_page_ids(hidden=None, discoverable=None):
+        for id in self.state.thingie.get_page_ids(hidden=None, discoverable=None):
             internal_links = self.get_internal_links(id)
             urls = {}
 
@@ -89,7 +89,7 @@ class LinkChecker:
                     continue
 
                 try:
-                    self.app.thingie.get_page(target_id)
+                    self.state.thingie.get_page(target_id)
                 except FileNotFoundError:
                     error = "node not found"
                 else:

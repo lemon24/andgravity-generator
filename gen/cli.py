@@ -148,7 +148,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
             log('done', page.path)
 
     errors = {}
-    for id, urls in app.link_checker.check_internal_links():
+    for id, urls in app.extensions['state'].link_checker.check_internal_links():
         id_errors = {
             url: data['error'] for url, data in urls.items() if data.get('error')
         }
