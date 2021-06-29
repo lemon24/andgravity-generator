@@ -142,7 +142,10 @@ class Page:
 
     @property
     def summary(self):
-        return self.meta.get('summary')
+        rv = self.meta.get('summary')
+        if rv:
+            rv = rv.rstrip()
+        return rv
 
     @property
     def tags(self):
