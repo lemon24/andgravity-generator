@@ -31,7 +31,7 @@ def test_freeze(tmp_path, subtests):
     expected_files = set(walk(expected_dir))
     output_files = set(walk(output_dir))
 
-    assert expected_files == output_files
+    assert expected_files == output_files, result.output
 
     for file in expected_files:
         with subtests.test(file):

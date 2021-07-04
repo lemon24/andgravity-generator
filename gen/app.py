@@ -393,6 +393,16 @@ class ListConverter(BaseConverter):
 
     def to_url(self, values):
         to_url = super().to_url
+        
+        # for some reason, starting with Flask/Werkzeug ~2.0 or 
+        # with Frozen-Flask 0.17 or 0.18,
+        # werkzeug.routing.MapAdapter.build() does
+        # "if len(value) == 1: value = value[0]"
+        # https://github.com/pallets/werkzeug/blob/2.0.1/src/werkzeug/routing.py#L2294-L2295
+
+        if isinstance(values, str):
+            return to_url(values)
+            
         return ','.join(to_url(value) for value in values)
 
 
