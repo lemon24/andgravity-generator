@@ -63,6 +63,13 @@ def render_node(id=None):
 
 
 @main_bp.app_template_global()
+def node_read_time(id=None):
+    if id is None:
+        id = request.view_args['id']
+    return get_state().node_read_time(id)
+
+
+@main_bp.app_template_global()
 def url_for_node(id=None, **values):
     if id is None:
         id = request.view_args['id']
@@ -100,11 +107,6 @@ def file(id, path):
         os.path.join(current_app.config['PROJECT_ROOT'], 'files'),
         os.path.join(id, path),
     )
-
-
-@main_bp.app_template_filter('readtime_minutes')
-def readtime_minutes_filter(html):
-    return readtime.of_html(html).minutes
 
 
 @main_bp.app_template_filter('humanize_apnumber')
@@ -326,6 +328,7 @@ def init_node_state(app, node_cache_decorator=None):
     state = _NodeState(app, thingie)
     if node_cache_decorator:
         state.render_node = node_cache_decorator(state.render_node)
+        state.node_read_time = node_cache_decorator(state.node_read_time)
 
     state.link_checker = link_checker = LinkChecker(state)
     if node_cache_decorator:
@@ -361,6 +364,10 @@ class _NodeState:
         page = self.thingie.get_page(id)
         with self._node_context(id, values=values):
             return markupsafe.Markup(markdown(page.content))
+        
+    def node_read_time(self, id):
+        # This is here because we need a method to cache.
+        return readtime.of_html(self.render_node(id))
 
     def _node_context(self, id, values=None):
         url = self.url_for_node(id, **(values or {}))
