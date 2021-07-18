@@ -191,7 +191,7 @@ class MyRenderer(mistune.HTMLRenderer):
         return super().link(link, text, title)
 
     def image(self, src, alt="", title=None):
-        src, _ = self._rewrite_url(src, None)
+        src, _ = self._rewrite_url(src, alt)
         return super().image(src, alt, title)
 
     # END url rewriting mixin
