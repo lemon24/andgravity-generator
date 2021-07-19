@@ -48,8 +48,13 @@ class LinkChecker:
         soup = self.get_soup(id)
         rv = {}
 
-        for anchor in soup.select('a[href]'):
-            url = anchor['href']
+        for element in soup.select('a[href], img[src]'):
+            if element.name == 'a':
+                url = element['href']
+            elif element.name == 'img':
+                url = element['src']
+            else:
+                assert False, f"unexpected element: {element!r}"
 
             if url in rv:
                 continue
@@ -77,22 +82,29 @@ class LinkChecker:
             urls = {}
 
             for url, link in internal_links.items():
-                # TODO: also check attachments/images here?
-                if link.endpoint != 'main.page':
-                    continue
-
-                target_id = link.args['id']
-
                 error = None
-
+                target_id = link.args['id']
+    
                 try:
                     self.state.thingie.get_page(target_id)
                 except FileNotFoundError:
                     error = "node not found"
-                else:
-                    if link.fragment:
-                        if link.fragment not in self.get_fragments(target_id):
-                            error = "fragment not found"
+    
+                # freezing checks if the URL actually exists,
+                # we only check special stuff here
+
+                if not error:
+                    if link.endpoint == 'main.page':
+                        if link.fragment:
+                            if link.fragment not in self.get_fragments(target_id):
+                                error = "fragment not found"
+                         
+                    elif link.endpoint == 'main.file':
+                        pass
+
+                    elif link.endpoint == 'feed.feed':
+                        if link.fragment:
+                            error = "feed URL should not have fragment"
 
                 urls[url] = {'error': error} if error else {}
 

@@ -49,7 +49,8 @@
     <title>attachments</title>
     <updated>2020-01-01T00:00:00+00:00</updated>
     <content type="html">&lt;p&gt;&lt;a href="/_file/attachments/linked.txt"&gt;attachment&lt;/a&gt;
-&lt;a href="http://example.com/"&gt;normal link&lt;/a&gt;&lt;/p&gt;
+&lt;a href="http://example.com/"&gt;normal link&lt;/a&gt;
+&lt;img src="/_file/attachments/image.png" alt="image" /&gt;&lt;/p&gt;
 </content>
     <link href="https://example.com/attachments" rel="alternate"/>
     <published>2020-01-01T00:00:00+00:00</published>
