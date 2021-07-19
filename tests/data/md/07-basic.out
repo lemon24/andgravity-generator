@@ -1,6 +1,6 @@
 <p><em>em</em> <strong>strong</strong>
 <a href="href">a</a>
-<img src="src" alt="img" /></p>
+<img class="img-responsive" src="src" alt="img" /></p>
 <ul>
 <li>ul</li>
 </ul>

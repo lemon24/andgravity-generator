@@ -1,4 +1,4 @@
 <p><a href="http://example/one">1</a>
 <a href="ATTACHMENT:TWO">2</a>
-<img src="http://example/three" alt="3" />
-<img src="ATTACHMENT:FOUR" alt="4" /></p>
+<img class="img-responsive" src="http://example/three" alt="3" />
+<img class="img-responsive" src="ATTACHMENT:FOUR" alt="4" /></p>

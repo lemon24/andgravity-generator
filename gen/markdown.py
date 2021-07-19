@@ -192,7 +192,9 @@ class MyRenderer(mistune.HTMLRenderer):
 
     def image(self, src, alt="", title=None):
         src, _ = self._rewrite_url(src, alt)
-        return super().image(src, alt, title)
+        rv = super().image(src, alt, title)
+        rv = rv.replace('<img ', '<img class="img-responsive" ')
+        return rv
 
     # END url rewriting mixin
 
