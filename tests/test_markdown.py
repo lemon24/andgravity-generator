@@ -17,7 +17,7 @@ DATA_FILES = [
 
 
 def load_lines(path):
-    return [s + '\n' for s in 'one two three four five'.split()]
+    return [s + '\n' for s in ['one', 'two', 'three', 'four', 'five', '']]
 
 
 @pytest.fixture(scope="module", params=DATA_FILES, ids=lambda t: os.path.basename(t[0]))

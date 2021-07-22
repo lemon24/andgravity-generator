@@ -303,9 +303,30 @@ def build_file_url(url, text=None):
     return url_for("main.file", id=id, path=path), text
 
 
+def load_literalinclude(url):
+    """Attachment contents: URL -> list of lines."""
+    
+    url_parsed = urlparse(url)
+    if url_parsed.scheme not in ('', 'attachment'):
+        raise ValueError(f"literalinclude file must not have scheme, got {url!r}")
+
+    if url_parsed.hostname:
+        raise ValueError(f"attachment: does not support host yet, got {url!r}")
+
+    path = url_parsed.path.lstrip('/')
+    
+    id = request.view_args['id']
+
+    # TODO: check path doesn't go above <project_root>/files/<id>
+
+    actual_path = os.path.join(current_app.config['PROJECT_ROOT'], 'files', id, path)
+    with open(actual_path) as f:
+        return list(f)
+
+
 # For now, we're OK with a global, non-configurable markdown instance.
 
-markdown = make_markdown([build_page_url, build_file_url])
+markdown = make_markdown([build_page_url, build_file_url], load_literalinclude)
 
 
 # BEGIN node state

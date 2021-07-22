@@ -79,16 +79,14 @@ def parse_block_code_options(info: str) -> dict:
     return options
 
 
+FALSY_VALUES = ('n', 'no', 'false', 'off')
+
+
 def to_pygments_options(options, line_count):
     rv = {}
 
     if 'linenos' in options:
-        rv['linenos'] = options['linenos'].lower() not in (
-            'n',
-            'no',
-            'false',
-            'off',
-        )
+        rv['linenos'] = options['linenos'].lower() not in FALSY_VALUES
 
     if 'emphasize-lines' in options:
         rv['hl_lines'] = [
@@ -99,6 +97,9 @@ def to_pygments_options(options, line_count):
     if 'lineno-start' in options:
         rv['linenostart'] = int(options['lineno-start'])
         rv.setdefault('linenos', True)
+        
+    if 'stripnl' in options:
+        rv['stripnl'] = options['stripnl'].lower() not in FALSY_VALUES
 
     # disable caption for now;
     # we don't know how to parse quoted literals (so it must be a single word),
@@ -293,6 +294,9 @@ class LiteralInclude(Directive):
                 options['language'] = get_lexer_for_filename(path).name
             except ClassNotFound:
                 pass
+            
+        if 'stripnl' not in options:
+            options['stripnl'] = 'n'
 
         return {
             'type': 'literalinclude',
@@ -315,7 +319,7 @@ def render_html_literalinclude(text, options):
     return render_highlighed_code(text, options) + '\n'
     
 
-def make_markdown(url_rewriters, load_literal_include_lines=None):
+def make_markdown(url_rewriters, load_literalinclude):
     return mistune.create_markdown(
         renderer=MyRenderer(escape=False, url_rewriters=url_rewriters),
         plugins=[
@@ -328,7 +332,7 @@ def make_markdown(url_rewriters, load_literal_include_lines=None):
             mistune.directives.Admonition(),
             plugin_toc_fix,
             plugin_footnotes_fix,
-            LiteralInclude(load_literal_include_lines),
+            LiteralInclude(load_literalinclude),
         ],
     )
 
@@ -343,7 +347,7 @@ if __name__ == '__main__':
         return url.upper(), text or 'default'   
     
     def load_lines(path):
-        return [s + '\n' for s in 'one two three four five'.split()]
+        return [s + '\n' for s in ['one', 'two', 'three', 'four', 'five', '']]
 
     md = make_markdown([rewrite], load_lines)
     
