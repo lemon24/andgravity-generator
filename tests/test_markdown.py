@@ -16,6 +16,10 @@ DATA_FILES = [
 ]
 
 
+def load_lines(path):
+    return [s + '\n' for s in 'one two three four five'.split()]
+
+
 @pytest.fixture(scope="module", params=DATA_FILES, ids=lambda t: os.path.basename(t[0]))
 def md_html(request):
     md, html = request.param
@@ -37,4 +41,4 @@ def build_file_url(url, text):
 
 def test_parts(md_html):
     md, html = md_html
-    assert make_markdown([build_node_url, build_file_url])(md) == html
+    assert make_markdown([build_node_url, build_file_url], load_lines)(md) == html

@@ -1,0 +1,10 @@
+.. literalinclude:: file
+
+.. literalinclude:: file.py
+
+.. literalinclude:: file.py
+    :linenos:
+
+.. literalinclude:: file.py
+    :linenos:
+    :lines: 2-3

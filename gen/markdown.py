@@ -2,12 +2,13 @@ import mistune.directives
 from mistune import escape
 from mistune import escape_html
 from mistune import escape_url
+from mistune.directives import Directive
 from pygments import highlight
 from pygments.formatters import get_formatter_by_name
 from pygments.lexers import get_lexer_by_name
-from pygments.lexers import guess_lexer
+from pygments.lexers import guess_lexer, get_lexer_for_filename
 from slugify import slugify
-
+from pygments.util import ClassNotFound 
 
 def do_highlight(code, lang, options=None):
     options = options or {}
@@ -48,7 +49,7 @@ def parselinenos(spec: str, total: int) -> list:
     return items
 
 
-def parse_options(rest: str, code: str) -> dict:
+def parse_block_code_options(info: str) -> dict:
     """Parse a highlighting options string to Pygments HTML formatter option.
 
     The options are named after those of the Sphinx code-block directive.
@@ -56,24 +57,33 @@ def parse_options(rest: str, code: str) -> dict:
 
     All options:
 
-        linenos emphasize-lines=2,4-6,8- lineno-start=10
+        <lang> linenos emphasize-lines=2,4-6,8- lineno-start=10
 
     Unknown options are ignored.
 
     """
-    rest = rest.strip()
-    if not rest:
-        return {}
+    lang, *rest = info.split(None, 1)
 
-    options = {}
+    options = {'language': lang}
+
+    rest = rest and rest[0]
+    if rest:
+        rest = rest.strip()
+    if not rest:
+        return options
+
     for part in rest.split():
         key, sep, value = part.partition('=')
         options[key] = value
+        
+    return options
 
+
+def to_pygments_options(options, line_count):
     rv = {}
 
     if 'linenos' in options:
-        rv['linenos'] = options.pop('linenos').lower() not in (
+        rv['linenos'] = options['linenos'].lower() not in (
             'n',
             'no',
             'false',
@@ -83,13 +93,11 @@ def parse_options(rest: str, code: str) -> dict:
     if 'emphasize-lines' in options:
         rv['hl_lines'] = [
             lineno + 1
-            for lineno in parselinenos(
-                options.pop('emphasize-lines'), len(code.splitlines())
-            )
+            for lineno in parselinenos(options['emphasize-lines'], line_count)
         ]
 
     if 'lineno-start' in options:
-        rv['linenostart'] = int(options.pop('lineno-start'))
+        rv['linenostart'] = int(options['lineno-start'])
         rv.setdefault('linenos', True)
 
     # disable caption for now;
@@ -105,6 +113,55 @@ def parse_options(rest: str, code: str) -> dict:
     return rv
 
 
+def render_highlighed_code(code, options):
+    options = dict(options)
+    lang = options.pop('language')
+    pygments_options = {'wrapcode': True}
+    pygments_options.update(to_pygments_options(options, len(code.splitlines())))
+
+    # To generate a unique (and stable-ish) id to use as lineanchors,
+    # we need to know how many code blocks with the same filename
+    # there have been in this document; I don't know how to do that
+    # (we want to pass some state around for the document,
+    # like the toc directive does).
+
+    html, data_lang = do_highlight(code, lang, pygments_options)
+
+    linenos_pre_index = html.index('<pre>')
+    try:
+        code_pre_index = html.index('<pre>', linenos_pre_index + 1)
+    except ValueError:
+        code_pre_index, linenos_pre_index = linenos_pre_index, None
+
+    # wrapcode doesn't work for the linenos, so we add it by hand
+    if linenos_pre_index:
+        html = html.replace('<pre>', '<pre class="code"><code>', 1)
+        html = html.replace('</pre>', '</code></pre>', 1)
+
+    html = html.replace(
+        '<pre>', '<pre class="code" data-lang="' + escape_html(data_lang) + '">', 1
+    )
+
+    # add .code-container to the outermost element
+    if linenos_pre_index:
+        html = html.replace(
+            '<table class="highlighttable">',
+            '<table class="highlighttable code-container">',
+        )
+    else:
+        html = html.replace(
+            '<div class="highlight">', '<div class="highlight code-container">'
+        )
+
+    return html
+
+
+def render_plain_code(code):
+    return (
+        '<pre class="code code-container"><code>' + escape(code) + '</code></pre>\n'
+    )
+
+
 class MyRenderer(mistune.HTMLRenderer):
     def __init__(self, *args, url_rewriters=(), **kwargs):
         super().__init__(*args, **kwargs)
@@ -115,58 +172,10 @@ class MyRenderer(mistune.HTMLRenderer):
     def block_code(self, code, info=None):
         if info is not None:
             info = info.strip()
-        if info:
-            return self._block_code_info(code, info)
-        return self._block_code_noinfo(code)
-
-    def _block_code_noinfo(self, code):
-        return (
-            '<pre class="code code-container"><code>' + escape(code) + '</code></pre>\n'
-        )
-
-    def _block_code_info(self, code, info):
-        lang, *rest = info.split(None, 1)
-
-        options = {'wrapcode': True}
-        rest = rest and rest[0]
-        if rest:
-            options.update(parse_options(rest, code))
-
-        # To generate a unique (and stable-ish) id to use as lineanchors,
-        # we need to know how many code blocks with the same filename
-        # there have been in this document; I don't know how to do that
-        # (we want to pass some state around for the document,
-        # like the toc directive does).
-
-        html, data_lang = do_highlight(code, lang, options)
-
-        linenos_pre_index = html.index('<pre>')
-        try:
-            code_pre_index = html.index('<pre>', linenos_pre_index + 1)
-        except ValueError:
-            code_pre_index, linenos_pre_index = linenos_pre_index, None
-
-        # wrapcode doesn't work for the linenos, so we add it by hand
-        if linenos_pre_index:
-            html = html.replace('<pre>', '<pre class="code"><code>', 1)
-            html = html.replace('</pre>', '</code></pre>', 1)
-
-        html = html.replace(
-            '<pre>', '<pre class="code" data-lang="' + escape_html(data_lang) + '">', 1
-        )
-
-        # add .code-container to the outermost element
-        if linenos_pre_index:
-            html = html.replace(
-                '<table class="highlighttable">',
-                '<table class="highlighttable code-container">',
-            )
-        else:
-            html = html.replace(
-                '<div class="highlight">', '<div class="highlight code-container">'
-            )
-
-        return html
+        if not info:
+            return render_plain_code(code)
+        options = parse_block_code_options(info)
+        return render_highlighed_code(code, options)
 
     # END code highlighting mixin
 
@@ -249,7 +258,64 @@ def plugin_footnotes_fix(md):
         md.renderer.register('footnote_item', render_html_footnote_item)
 
 
-def make_markdown(url_rewriters):
+class LiteralInclude(Directive):
+    
+    def __init__(self, load_lines):
+        self.load_lines = load_lines
+
+    def parse(self, block, m, state):
+        options = dict(self.parse_options(m))
+
+        path = m.group('value')
+        text = self.parse_text(m)
+        # TODO handle
+        assert not text.strip(), text
+
+        # TODO handle
+        lines = self.load_lines(path)
+
+        lines_option = options.pop('lines', '').strip()
+        if lines_option:
+            only_lines = parselinenos(lines_option, len(lines))
+            
+            line_distances = {only_lines[i+1] - only_lines[i] for i in range(len(only_lines) - 1)}
+
+            # TODO: handle
+            assert line_distances == {1}, f"lines must be contiguous; {lines_option}"
+        
+            # TODO: handle indexerror
+            lines = [lines[i] for i in only_lines]
+            
+            options.setdefault('lineno-start', only_lines[0] + 1)
+
+        if 'language' not in options:
+            try:
+                options['language'] = get_lexer_for_filename(path).name
+            except ClassNotFound:
+                pass
+
+        return {
+            'type': 'literalinclude',
+            'raw': ''.join(lines),
+            'params': (options,)
+        }
+
+    def __call__(self, md):
+        self.register_directive(md, 'literalinclude')
+        if md.renderer.NAME == 'html':
+            md.renderer.register('literalinclude', render_html_literalinclude)
+        elif md.renderer.NAME == 'ast':
+            assert False, "no AST renderer for literalinclude"
+
+
+
+def render_html_literalinclude(text, options):
+    if 'language' not in options:
+        return render_plain_code(text) + '\n'
+    return render_highlighed_code(text, options) + '\n'
+    
+
+def make_markdown(url_rewriters, load_literal_include_lines=None):
     return mistune.create_markdown(
         renderer=MyRenderer(escape=False, url_rewriters=url_rewriters),
         plugins=[
@@ -262,5 +328,25 @@ def make_markdown(url_rewriters):
             mistune.directives.Admonition(),
             plugin_toc_fix,
             plugin_footnotes_fix,
+            LiteralInclude(load_literal_include_lines),
         ],
     )
+
+
+
+if __name__ == '__main__':
+    
+    with open('tests/data/md/09-literalinclude.in') as f:
+        text = f.read()
+
+    def rewrite(url, text):
+        return url.upper(), text or 'default'   
+    
+    def load_lines(path):
+        return [s + '\n' for s in 'one two three four five'.split()]
+
+    md = make_markdown([rewrite], load_lines)
+    
+    print(md(text))
+    
+    
