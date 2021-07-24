@@ -289,11 +289,11 @@ def build_file_url(url, text=None):
         return None
 
     if url_parsed.hostname:
-        raise ValueError(f"attachment: does not support host yet, got {url!r}")
+        id = url_parsed.hostname
+    else:
+        id = request.view_args['id']
 
     path = url_parsed.path.lstrip('/')
-
-    id = request.view_args['id']
 
     if not text:
         raise ValueError("attachment: getting text not supported yet")
@@ -311,13 +311,14 @@ def load_literalinclude(url):
         raise ValueError(f"literalinclude file must not have scheme, got {url!r}")
 
     if url_parsed.hostname:
-        raise ValueError(f"attachment: does not support host yet, got {url!r}")
-
+        id = url_parsed.hostname
+    else:
+        id = request.view_args['id']
+        
     path = url_parsed.path.lstrip('/')
-    
-    id = request.view_args['id']
 
     # TODO: check path doesn't go above <project_root>/files/<id>
+    # TODO: this is cacheable, and should be done by thingie
 
     actual_path = os.path.join(current_app.config['PROJECT_ROOT'], 'files', id, path)
     with open(actual_path) as f:

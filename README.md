@@ -9,6 +9,7 @@ Features:
   * heading links
   * heading slugs
   * syntax highlighting (Pygments)
+  * include highlighted code fragments from file (like Sphinx' literalinclude)
 * attachments
 * tags
 * Atom feeds (global, per-tag)
