@@ -281,9 +281,6 @@ class LiteralInclude(Directive):
             
             line_distances = {only_lines[i+1] - only_lines[i] for i in range(len(only_lines) - 1)}
 
-            # TODO: handle
-            assert line_distances == {1}, f"lines must be contiguous; {lines_option}"
-        
             # TODO: handle indexerror
             lines = [lines[i] for i in only_lines]
             
