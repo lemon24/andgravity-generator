@@ -272,8 +272,13 @@ class LiteralInclude(Directive):
         # TODO handle
         assert not text.strip(), text
 
-        # TODO handle
-        lines = self.load_lines(path)
+        try:
+            lines = self.load_lines(path)
+        except Exception as e:
+            return {
+                'type': 'block_error',
+                'raw': f"could not open attachment: {e}",
+            }
 
         lines_option = options.pop('lines', '').strip()
         if lines_option:
