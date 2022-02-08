@@ -190,8 +190,8 @@ def make_node_cache_decorator(cache, log):
     def node_cache_decorator(fn):
         @functools.lru_cache
         @functools.wraps(fn)
-        def wrapper(id):
-            key = f'{fn.__module__}.{fn.__qualname__}', id
+        def wrapper(id, *args):
+            key = (f'{fn.__module__}.{fn.__qualname__}', id) + args
 
             rv = cache.get(key)
             if rv is not None:
@@ -200,7 +200,7 @@ def make_node_cache_decorator(cache, log):
 
             log('miss', *key)
 
-            rv = fn(id)
+            rv = fn(id, *args)
             cache.set(key, rv, tag=f'node:{id}')
             return rv
 

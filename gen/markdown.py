@@ -276,7 +276,7 @@ class LiteralInclude(Directive):
         except Exception as e:
             return {
                 'type': 'block_error',
-                'raw': f"could not open attachment: {e}",
+                'raw': f"could not open attachment: {type(e).__name__}: {e}",
             }
 
         lines_option = options.pop('lines', '').strip()
@@ -332,7 +332,7 @@ class Snippet(Directive):
         except Exception as e:
             return {
                 'type': 'block_error',
-                'raw': f"could not render snippet: {e}",
+                'raw': f"could not render snippet {value!r}: {type(e).__name__}: {e}",
             }
 
         return {'type': 'block_html', 'raw': raw}

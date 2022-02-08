@@ -30,6 +30,16 @@
 &lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;a href=""&gt;label&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;a href=""&gt;one&lt;/a&gt;&lt;/p&gt;
+
+&lt;div&gt;
+snippet: test
+options: {&amp;#39;key&amp;#39;: &amp;#39;value&amp;#39;}
+on page: one
+endpoint info: feed;
+
+&lt;p&gt;&lt;em&gt;text&lt;/em&gt;&lt;/p&gt;
+
+&lt;/div&gt;
 </content>
     <link href="https://example.com/one" rel="alternate"/>
     <summary>&lt;b&gt;plain text&lt;/b&gt; summary</summary>

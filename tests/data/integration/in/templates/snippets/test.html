@@ -1,0 +1,9 @@
+
+<div>
+snippet: {{ snippet }}
+options: {{ options }}
+on page: {{ page.id }}
+endpoint info: {{ endpoint_info.endpoint }}; {{ endpoint_info.tags | join(', ') }}
+
+{{ text | markdown }}
+</div>

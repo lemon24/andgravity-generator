@@ -2,10 +2,12 @@ import functools
 import ntpath
 import os.path
 import warnings
+from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
 from dataclasses import field
 from itertools import chain
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 import bs4
@@ -59,7 +61,37 @@ def get_thingie():
 def render_node(id=None):
     if id is None:
         id = request.view_args['id']
-    return get_state().render_node(id, **request.args)
+
+    if not hasattr(g, 'endpoint_info_stack'):
+        g.endpoint_info_stack = deque()
+    try:
+        endpoint_info = request.endpoint, request.view_args
+    except RuntimeError:
+        endpoint_info = None
+    else:
+        g.endpoint_info_stack.append(endpoint_info)
+
+    try:
+        return get_state().render_node(id, get_real_endpoint(), **request.args)
+    finally:
+        if endpoint_info:
+            g.endpoint_info_stack.pop()
+
+
+class _EndpointInfo(NamedTuple):
+    endpoint: "Literal['main', 'feed']" = 'main'
+    tags: tuple = ()
+
+
+def get_real_endpoint(endpoint_info_stack=None):
+    if endpoint_info_stack is None:
+        endpoint_info_stack = getattr(g, 'endpoint_info_stack', ())
+    for endpoint, view_args in endpoint_info_stack:
+        if endpoint == 'feed.tag_feed':
+            return _EndpointInfo('feed', tuple(sorted(view_args['tags'])))
+        if endpoint == 'feed.feed':
+            return _EndpointInfo('feed')
+    return _EndpointInfo('main')
 
 
 @main_bp.app_template_global()
@@ -112,6 +144,11 @@ def file(id, path):
 @main_bp.app_template_filter('humanize_apnumber')
 def humanize_apnumber_filter(value):
     return humanize.apnumber(value)
+
+
+@main_bp.app_template_filter('markdown')
+def markdown_filter(text):
+    return markupsafe.Markup(markdown(text))
 
 
 main_bp.add_app_template_filter(yaml.safe_dump, 'to_yaml')
@@ -325,12 +362,29 @@ def load_literalinclude(url):
         return list(f)
 
 
+def render_snippet(snippet, text, options):
+    template = current_app.jinja_env.get_template(
+        os.path.join('snippets', snippet + '.html')
+    )
+
+    page = get_thingie().get_page(request.view_args['id'])
+
+    return render_template(
+        template,
+        snippet=snippet,
+        text=text,
+        options=options,
+        page=page,
+        endpoint_info=get_real_endpoint(),
+    )
+
+
 # For now, we're OK with a global, non-configurable markdown instance.
 
 markdown = make_markdown(
     url_rewriters=[build_page_url, build_file_url],
     load_literalinclude=load_literalinclude,
-    render_snippet=None,
+    render_snippet=render_snippet,
 )
 
 
@@ -356,7 +410,7 @@ def init_node_state(app, node_cache_decorator=None):
         state.render_node = node_cache_decorator(state.render_node)
         state.node_read_time = node_cache_decorator(state.node_read_time)
 
-    state.link_checker = link_checker = LinkChecker(state)
+    state.link_checker = link_checker = LinkChecker(state, _EndpointInfo())
     if node_cache_decorator:
         link_checker.get_fragments = node_cache_decorator(link_checker.get_fragments)
         link_checker.get_internal_links = node_cache_decorator(
@@ -383,23 +437,25 @@ class _NodeState:
 
     _app: Flask
     thingie: Thingie
-    link_checker: LinkChecker = field(init=False)
+    link_checker: LinkChecker = field(init=False, default=None)
 
-    def render_node(self, id, **values):
+    def render_node(self, id, real_endpoint, **values):
         # This is here because we need a method to cache.
+        # real_endpoint is set by render_node() for cache invalidation.
         page = self.thingie.get_page(id)
         with self._node_context(id, values=values):
             return markupsafe.Markup(markdown(page.content))
 
     def node_read_time(self, id):
         # This is here because we need a method to cache.
-        return readtime.of_html(self.render_node(id))
+        return readtime.of_html(self.render_node(id, ('main', ())))
 
     def _node_context(self, id, values=None):
         url = self.url_for_node(id, **(values or {}))
         return self._app.test_request_context(url)
 
-    def render_page(self, id):
+    def render_page(self, id, real_endpoint):
+        # real_endpoint is set for cache invalidation.
         with self._app.test_client() as client:
             rv = client.get(self.url_for_node(id))
             assert rv.status_code == 200, rv.status

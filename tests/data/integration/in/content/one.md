@@ -21,3 +21,6 @@ summary: <b>plain text</b> summary
 
 []()
 
+.. snippet:: test
+    :key: value
+    *text*

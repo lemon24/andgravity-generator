@@ -14,6 +14,9 @@ def walk(path):
         for file in files:
             yield os.path.relpath(os.path.join(root, file), path)
 
+def clean_trailing_whitespace(text):
+    return ''.join(l.rstrip() + '\n' for l in text.rstrip().splitlines())
+
 
 def test_freeze(tmp_path, subtests):
     input_dir = ROOT.joinpath('data/integration/in')
@@ -36,9 +39,9 @@ def test_freeze(tmp_path, subtests):
     for file in expected_files:
         with subtests.test(file):
             with expected_dir.joinpath(file).open() as f:
-                expected = f.read()
+                expected = clean_trailing_whitespace(f.read())
             with output_dir.joinpath(file).open() as f:
-                output = f.read()
+                output = clean_trailing_whitespace(f.read())
             assert expected == output, file
 
 

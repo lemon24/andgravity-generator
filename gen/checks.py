@@ -28,9 +28,10 @@ def cache_node_methods(self, cache_decorator):
 @dataclass
 class LinkChecker:
     state: 'gen.app._NodeState'
+    default_endpoint_info: 'gen.app._EndpointInfo'
 
     def get_soup(self, id):
-        return bs4.BeautifulSoup(self.state.render_page(id))
+        return bs4.BeautifulSoup(self.state.render_page(id, self.default_endpoint_info))
 
     def get_fragments(self, id):
         soup = self.get_soup(id)
@@ -84,12 +85,12 @@ class LinkChecker:
             for url, link in internal_links.items():
                 error = None
                 target_id = link.args['id']
-    
+
                 try:
                     self.state.thingie.get_page(target_id)
                 except FileNotFoundError:
                     error = "node not found"
-    
+
                 # freezing checks if the URL actually exists,
                 # we only check special stuff here
 
@@ -98,7 +99,7 @@ class LinkChecker:
                         if link.fragment:
                             if link.fragment not in self.get_fragments(target_id):
                                 error = "fragment not found"
-                         
+
                     elif link.endpoint == 'main.file':
                         pass
 
