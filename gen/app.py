@@ -305,7 +305,7 @@ def build_file_url(url, text=None):
 
 def load_literalinclude(url):
     """Attachment contents: URL -> list of lines."""
-    
+
     url_parsed = urlparse(url)
     if url_parsed.scheme not in ('', 'attachment'):
         raise ValueError(f"literalinclude file must not have scheme, got {url!r}")
@@ -314,7 +314,7 @@ def load_literalinclude(url):
         id = url_parsed.hostname
     else:
         id = request.view_args['id']
-        
+
     path = url_parsed.path.lstrip('/')
 
     # TODO: check path doesn't go above <project_root>/files/<id>
@@ -327,7 +327,11 @@ def load_literalinclude(url):
 
 # For now, we're OK with a global, non-configurable markdown instance.
 
-markdown = make_markdown([build_page_url, build_file_url], load_literalinclude)
+markdown = make_markdown(
+    url_rewriters=[build_page_url, build_file_url],
+    load_literalinclude=load_literalinclude,
+    render_snippet=None,
+)
 
 
 # BEGIN node state
@@ -386,7 +390,7 @@ class _NodeState:
         page = self.thingie.get_page(id)
         with self._node_context(id, values=values):
             return markupsafe.Markup(markdown(page.content))
-        
+
     def node_read_time(self, id):
         # This is here because we need a method to cache.
         return readtime.of_html(self.render_node(id))
@@ -422,8 +426,8 @@ class ListConverter(BaseConverter):
 
     def to_url(self, values):
         to_url = super().to_url
-        
-        # for some reason, starting with Flask/Werkzeug ~2.0 or 
+
+        # for some reason, starting with Flask/Werkzeug ~2.0 or
         # with Frozen-Flask 0.17 or 0.18,
         # werkzeug.routing.MapAdapter.build() does
         # "if len(value) == 1: value = value[0]"
@@ -431,7 +435,7 @@ class ListConverter(BaseConverter):
 
         if isinstance(values, str):
             return to_url(values)
-            
+
         return ','.join(to_url(value) for value in values)
 
 

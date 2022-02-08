@@ -1,0 +1,7 @@
+
+.. snippet:: one
+    :key: value
+    *text*
+    more text
+
+.. snippet:: two

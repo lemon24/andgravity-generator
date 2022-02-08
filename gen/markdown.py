@@ -6,9 +6,11 @@ from mistune.directives import Directive
 from pygments import highlight
 from pygments.formatters import get_formatter_by_name
 from pygments.lexers import get_lexer_by_name
-from pygments.lexers import guess_lexer, get_lexer_for_filename
+from pygments.lexers import get_lexer_for_filename
+from pygments.lexers import guess_lexer
+from pygments.util import ClassNotFound
 from slugify import slugify
-from pygments.util import ClassNotFound 
+
 
 def do_highlight(code, lang, options=None):
     options = options or {}
@@ -75,7 +77,7 @@ def parse_block_code_options(info: str) -> dict:
     for part in rest.split():
         key, sep, value = part.partition('=')
         options[key] = value
-        
+
     return options
 
 
@@ -97,7 +99,7 @@ def to_pygments_options(options, line_count):
     if 'lineno-start' in options:
         rv['linenostart'] = int(options['lineno-start'])
         rv.setdefault('linenos', True)
-        
+
     if 'stripnl' in options:
         rv['stripnl'] = options['stripnl'].lower() not in FALSY_VALUES
 
@@ -158,9 +160,7 @@ def render_highlighed_code(code, options):
 
 
 def render_plain_code(code):
-    return (
-        '<pre class="code code-container"><code>' + escape(code) + '</code></pre>\n'
-    )
+    return '<pre class="code code-container"><code>' + escape(code) + '</code></pre>\n'
 
 
 class MyRenderer(mistune.HTMLRenderer):
@@ -260,7 +260,6 @@ def plugin_footnotes_fix(md):
 
 
 class LiteralInclude(Directive):
-    
     def __init__(self, load_lines):
         self.load_lines = load_lines
 
@@ -283,12 +282,14 @@ class LiteralInclude(Directive):
         lines_option = options.pop('lines', '').strip()
         if lines_option:
             only_lines = parselinenos(lines_option, len(lines))
-            
-            line_distances = {only_lines[i+1] - only_lines[i] for i in range(len(only_lines) - 1)}
+
+            line_distances = {
+                only_lines[i + 1] - only_lines[i] for i in range(len(only_lines) - 1)
+            }
 
             # TODO: handle indexerror
             lines = [lines[i] for i in only_lines]
-            
+
             options.setdefault('lineno-start', only_lines[0] + 1)
 
         if 'language' not in options:
@@ -296,15 +297,11 @@ class LiteralInclude(Directive):
                 options['language'] = get_lexer_for_filename(path).name
             except ClassNotFound:
                 pass
-            
+
         if 'stripnl' not in options:
             options['stripnl'] = 'n'
 
-        return {
-            'type': 'literalinclude',
-            'raw': ''.join(lines),
-            'params': (options,)
-        }
+        return {'type': 'literalinclude', 'raw': ''.join(lines), 'params': (options,)}
 
     def __call__(self, md):
         self.register_directive(md, 'literalinclude')
@@ -314,14 +311,37 @@ class LiteralInclude(Directive):
             assert False, "no AST renderer for literalinclude"
 
 
-
 def render_html_literalinclude(text, options):
     if 'language' not in options:
         return render_plain_code(text) + '\n'
     return render_highlighed_code(text, options) + '\n'
-    
 
-def make_markdown(url_rewriters, load_literalinclude):
+
+class Snippet(Directive):
+    def __init__(self, render):
+        self.render = render
+
+    def parse(self, block, m, state):
+        options = dict(self.parse_options(m))
+        value = m.group('value')
+        text = self.parse_text(m)
+
+        # TODO: maybe extract some standard options
+        try:
+            raw = self.render(value, text, options)
+        except Exception as e:
+            return {
+                'type': 'block_error',
+                'raw': f"could not render snippet: {e}",
+            }
+
+        return {'type': 'block_html', 'raw': raw}
+
+    def __call__(self, md):
+        self.register_directive(md, 'snippet')
+
+
+def make_markdown(url_rewriters, load_literalinclude, render_snippet):
     return mistune.create_markdown(
         renderer=MyRenderer(escape=False, url_rewriters=url_rewriters),
         plugins=[
@@ -335,24 +355,22 @@ def make_markdown(url_rewriters, load_literalinclude):
             plugin_toc_fix,
             plugin_footnotes_fix,
             LiteralInclude(load_literalinclude),
+            Snippet(render_snippet),
         ],
     )
 
 
-
 if __name__ == '__main__':
-    
+
     with open('tests/data/md/09-literalinclude.in') as f:
         text = f.read()
 
     def rewrite(url, text):
-        return url.upper(), text or 'default'   
-    
+        return url.upper(), text or 'default'
+
     def load_lines(path):
         return [s + '\n' for s in ['one', 'two', 'three', 'four', 'five', '']]
 
     md = make_markdown([rewrite], load_lines)
-    
+
     print(md(text))
-    
-    

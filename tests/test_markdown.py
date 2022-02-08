@@ -1,5 +1,6 @@
 import os.path
 from glob import glob
+from textwrap import dedent
 
 import mistune
 import pytest
@@ -39,6 +40,10 @@ def build_file_url(url, text):
     return None
 
 
+def render_snippet(value, text, options):
+    return f"snippet: {value}\noptions: {options}\ntext: {dedent(text)!r}"
+
+
 def test_parts(md_html):
     md, html = md_html
-    assert make_markdown([build_node_url, build_file_url], load_lines)(md) == html
+    assert make_markdown([build_node_url, build_file_url], load_lines, render_snippet)(md) == html
