@@ -34,6 +34,7 @@ from werkzeug.exceptions import NotFound
 from werkzeug.routing import BaseConverter
 
 from .checks import LinkChecker
+from .checks import RenderingChecker
 from .core import Thingie
 from .markdown import make_markdown
 
@@ -279,6 +280,7 @@ check_bp = Blueprint('check', __name__)
 @check_bp.route('/internal-links.json')
 def internal_links():
     # TODO: instantiate and cache link checker here, maybe
+    # TODO: is this page worth having? haven't really been using it...
     return dict(get_state().link_checker.check_internal_links())
 
 
@@ -410,12 +412,21 @@ def init_node_state(app, node_cache_decorator=None):
         state.render_node = node_cache_decorator(state.render_node)
         state.node_read_time = node_cache_decorator(state.node_read_time)
 
+    # if instead of endpoint_info only we want to check for everything,
+    # we'll have to have a *Checker for main+feed,
+    # and one for each feed+tag combo for which we generate feeds
+
     state.link_checker = link_checker = LinkChecker(state, _EndpointInfo())
     if node_cache_decorator:
         link_checker.get_fragments = node_cache_decorator(link_checker.get_fragments)
         link_checker.get_internal_links = node_cache_decorator(
             link_checker.get_internal_links
         )
+
+    state.rendering_checker = rendering_checker = RenderingChecker(
+        state, _EndpointInfo()
+    )
+    # nothing to cache for RenderingChecker? nothing to cache...
 
     app.extensions['state'] = state
 
@@ -438,6 +449,7 @@ class _NodeState:
     _app: Flask
     thingie: Thingie
     link_checker: LinkChecker = field(init=False, default=None)
+    rendering_checker: RenderingChecker = field(init=False, default=None)
 
     def render_node(self, id, real_endpoint, **values):
         # This is here because we need a method to cache.

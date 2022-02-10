@@ -9,3 +9,7 @@
 [](two#id-error)
 
 <a href='/inexistent-node'>...</a>
+
+.. unknown-directive::
+
+.. snippet:: unknown-snippet

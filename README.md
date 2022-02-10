@@ -15,6 +15,7 @@ Features:
 * tags
 * Atom feeds (global, per-tag)
 * internal URL validation (including fragments)
+* check for Markdown rendering errors
 * fast generation through aggressive caching
 * live preview
 

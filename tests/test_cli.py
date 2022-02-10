@@ -2,6 +2,7 @@ import os.path
 from pathlib import Path
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from gen.cli import cli
@@ -47,16 +48,21 @@ def test_freeze(tmp_path, subtests):
 
 BROKEN_LINKS_YAML = """\
 one:
-  /inexistent-node: node not found
-  /two#a-name-error: fragment not found
-  /two#header-error: fragment not found
-  /two#id-error: fragment not found
+  internal-links:
+    /inexistent-node: node not found
+    /two#a-name-error: fragment not found
+    /two#header-error: fragment not found
+    /two#id-error: fragment not found
+  markdown:
+  - 'Unsupported directive: unknown-directive'
+  - 'could not render snippet ''unknown-snippet'': TemplateNotFound: snippets/unknown-snippet.html'
 """
 
+# including the error messages is a bit brittle, but eh...
 
 @pytest.mark.filterwarnings('ignore:Nothing frozen')
-def test_freeze_broken_links(tmp_path, subtests):
-    input_dir = ROOT.joinpath('data/integration-broken-links/in')
+def test_freeze_checks(tmp_path, subtests):
+    input_dir = ROOT.joinpath('data/integration-checks/in')
     output_dir = tmp_path.joinpath('out')
 
     runner = CliRunner()
@@ -67,3 +73,9 @@ def test_freeze_broken_links(tmp_path, subtests):
     )
     assert result.exit_code == 1, result.output
     assert BROKEN_LINKS_YAML in result.output, result.output
+
+    one_html = output_dir.joinpath('one.html').read_text()
+    one_errors = yaml.safe_load(BROKEN_LINKS_YAML)['one']
+
+    for error in one_errors['markdown']:
+        assert error in one_html, error

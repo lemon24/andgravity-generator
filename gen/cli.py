@@ -147,17 +147,24 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
         for page in pages:
             log('done', page.path)
 
+    # TODO: maybe FREEZER_IGNORE_404_NOT_FOUND, so we don't fail fast for broken links (and get a full error report later)?
+
     errors = {}
     for id, urls in app.extensions['state'].link_checker.check_internal_links():
         id_errors = {
             url: data['error'] for url, data in urls.items() if data.get('error')
         }
         if id_errors:
-            errors[id] = id_errors
+            errors.setdefault(id, {})['internal-links'] = id_errors
+    for id, id_errors in app.extensions[
+        'state'
+    ].rendering_checker.check_markdown_errors():
+        if id_errors:
+            errors.setdefault(id, {})['markdown'] = id_errors
 
     if errors:
         errors_str = yaml.safe_dump(errors)
-        raise click.ClickException(f"Broken internal URLs:\n\n{errors_str}\n")
+        raise click.ClickException(f"Some checks failed:\n\n{errors_str}\n")
 
     # TODO: these should be per-freezer (it's only suitable for github pages)
     # TODO: maybe get the freezer to not clobber them

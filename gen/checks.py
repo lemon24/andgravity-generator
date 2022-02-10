@@ -24,14 +24,18 @@ def cache_node_methods(self, cache_decorator):
         setattr(self, name, cache_decorator(getattr(self, name)))
 """
 
+# TODO: get_soup() is shared, and the loop in check_* is shared
+# almost doubles rendering time when fully cached,
+# maybe soup should be provided by state
+
 
 @dataclass
 class LinkChecker:
     state: 'gen.app._NodeState'
-    default_endpoint_info: 'gen.app._EndpointInfo'
+    endpoint_info: 'gen.app._EndpointInfo'
 
     def get_soup(self, id):
-        return bs4.BeautifulSoup(self.state.render_page(id, self.default_endpoint_info))
+        return bs4.BeautifulSoup(self.state.render_page(id, self.endpoint_info))
 
     def get_fragments(self, id):
         soup = self.get_soup(id)
@@ -110,3 +114,20 @@ class LinkChecker:
                 urls[url] = {'error': error} if error else {}
 
             yield id, urls
+
+
+@dataclass
+class RenderingChecker:
+    state: 'gen.app._NodeState'
+    endpoint_info: 'gen.app._EndpointInfo'
+
+    def get_soup(self, id):
+        return bs4.BeautifulSoup(self.state.render_page(id, self.endpoint_info))
+
+    def get_markdown_errors(self, id):
+        soup = self.get_soup(id)
+        return [element.text for element in soup.select('div.error')]
+
+    def check_markdown_errors(self):
+        for id in self.state.thingie.get_page_ids(hidden=None, discoverable=None):
+            yield id, self.get_markdown_errors(id)
