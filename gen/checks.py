@@ -1,4 +1,3 @@
-import warnings
 from dataclasses import dataclass
 from typing import NamedTuple
 from urllib.parse import urlparse
@@ -6,10 +5,6 @@ from urllib.parse import urlparse
 import bs4
 
 from .core import Thingie
-
-warnings.filterwarnings(
-    'ignore', message='No parser was explicitly specified', module='gen.checks'
-)
 
 
 class InternalLink(NamedTuple):
@@ -24,21 +19,38 @@ def cache_node_methods(self, cache_decorator):
         setattr(self, name, cache_decorator(getattr(self, name)))
 """
 
-# TODO: get_soup() is shared, and the loop in check_* is shared
-# almost doubles rendering time when fully cached,
-# maybe soup should be provided by state
+
+@dataclass
+class MetaChecker:
+    state: 'gen.app._NodeState'
+    checkers: 'list[Checker]'
+
+    def check(self, id, endpoint):
+        rv = {}
+        for checker in self.checkers:
+            rv.update(checker.check(id, endpoint))
+        return rv
+
+    def check_all(self):
+        from .app import EndpointInfo
+
+        endpoint = EndpointInfo()
+        # TODO: check for all endpoints, not just endpoint
+        # we'll have one for main+feed,
+        # and one for each feed+tag combo for which we generate feeds
+
+        for id in self.state.thingie.get_page_ids(hidden=None, discoverable=None):
+            errors = self.check(id, endpoint)
+            if errors:
+                yield id, errors
 
 
 @dataclass
 class LinkChecker:
     state: 'gen.app._NodeState'
-    endpoint_info: 'gen.app._EndpointInfo'
 
-    def get_soup(self, id):
-        return bs4.BeautifulSoup(self.state.render_page(id, self.endpoint_info))
-
-    def get_fragments(self, id):
-        soup = self.get_soup(id)
+    def get_fragments(self, id, endpoint):
+        soup = self.state.get_soup(id, endpoint)
         rv = set()
 
         for element in soup.select('[id], a[name]'):
@@ -49,8 +61,8 @@ class LinkChecker:
 
         return rv
 
-    def get_internal_links(self, id):
-        soup = self.get_soup(id)
+    def get_internal_links(self, id, endpoint):
+        soup = self.state.get_soup(id, endpoint)
         rv = {}
 
         for element in soup.select('a[href], img[src]'):
@@ -81,53 +93,47 @@ class LinkChecker:
 
         return rv
 
-    def check_internal_links(self):
-        for id in self.state.thingie.get_page_ids(hidden=None, discoverable=None):
-            internal_links = self.get_internal_links(id)
-            urls = {}
+    def check(self, id, endpoint):
+        internal_links = self.get_internal_links(id, endpoint)
+        urls = []
 
-            for url, link in internal_links.items():
-                error = None
-                target_id = link.args['id']
+        for url, link in internal_links.items():
+            error = None
+            target_id = link.args['id']
 
-                try:
-                    self.state.thingie.get_page(target_id)
-                except FileNotFoundError:
-                    error = "node not found"
+            # TODO: should this be per-endpoint-info?
+            try:
+                self.state.thingie.get_page(target_id)
+            except FileNotFoundError:
+                error = "node not found"
 
-                # freezing checks if the URL actually exists,
-                # we only check special stuff here
+            # freezing checks if the URL actually exists,
+            # we only check special stuff here
 
-                if not error:
-                    if link.endpoint == 'main.page':
-                        if link.fragment:
-                            if link.fragment not in self.get_fragments(target_id):
-                                error = "fragment not found"
+            if not error:
+                if link.endpoint == 'main.page':
+                    if link.fragment:
+                        if link.fragment not in self.get_fragments(target_id, endpoint):
+                            error = "fragment not found"
 
-                    elif link.endpoint == 'main.file':
-                        pass
+                elif link.endpoint == 'main.file':
+                    pass
 
-                    elif link.endpoint == 'feed.feed':
-                        if link.fragment:
-                            error = "feed URL should not have fragment"
+                elif link.endpoint == 'feed.feed':
+                    if link.fragment:
+                        error = "feed URL should not have fragment"
 
-                urls[url] = {'error': error} if error else {}
+            if error:
+                urls.append({url: error})
 
-            yield id, urls
+        return {'internal-links': urls} if urls else {}
 
 
 @dataclass
 class RenderingChecker:
     state: 'gen.app._NodeState'
-    endpoint_info: 'gen.app._EndpointInfo'
 
-    def get_soup(self, id):
-        return bs4.BeautifulSoup(self.state.render_page(id, self.endpoint_info))
-
-    def get_markdown_errors(self, id):
-        soup = self.get_soup(id)
-        return [element.text for element in soup.select('div.error')]
-
-    def check_markdown_errors(self):
-        for id in self.state.thingie.get_page_ids(hidden=None, discoverable=None):
-            yield id, self.get_markdown_errors(id)
+    def check(self, id, endpoint):
+        soup = self.state.get_soup(id, endpoint)
+        errors = [element.text for element in soup.select('div.error')]
+        return {'markdown': errors} if errors else {}

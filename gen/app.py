@@ -5,7 +5,6 @@ import warnings
 from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
-from dataclasses import field
 from itertools import chain
 from typing import NamedTuple
 from urllib.parse import urlparse
@@ -34,6 +33,7 @@ from werkzeug.exceptions import NotFound
 from werkzeug.routing import BaseConverter
 
 from .checks import LinkChecker
+from .checks import MetaChecker
 from .checks import RenderingChecker
 from .core import Thingie
 from .markdown import make_markdown
@@ -79,7 +79,7 @@ def render_node(id=None):
             g.endpoint_info_stack.pop()
 
 
-class _EndpointInfo(NamedTuple):
+class EndpointInfo(NamedTuple):
     endpoint: "Literal['main', 'feed']" = 'main'
     tags: tuple = ()
 
@@ -89,10 +89,10 @@ def get_real_endpoint(endpoint_info_stack=None):
         endpoint_info_stack = getattr(g, 'endpoint_info_stack', ())
     for endpoint, view_args in endpoint_info_stack:
         if endpoint == 'feed.tag_feed':
-            return _EndpointInfo('feed', tuple(sorted(view_args['tags'])))
+            return EndpointInfo('feed', tuple(sorted(view_args['tags'])))
         if endpoint == 'feed.feed':
-            return _EndpointInfo('feed')
-    return _EndpointInfo('main')
+            return EndpointInfo('feed')
+    return EndpointInfo('main')
 
 
 @main_bp.app_template_global()
@@ -271,19 +271,6 @@ class AtomXMLBaseExt(feedgen.ext.base.BaseEntryExtension):
         return entry
 
 
-# BEGIN check blueprint
-
-
-check_bp = Blueprint('check', __name__)
-
-
-@check_bp.route('/internal-links.json')
-def internal_links():
-    # TODO: instantiate and cache link checker here, maybe
-    # TODO: is this page worth having? haven't really been using it...
-    return dict(get_state().link_checker.check_internal_links())
-
-
 # BEGIN markdown
 
 
@@ -411,24 +398,26 @@ def init_node_state(app, node_cache_decorator=None):
     if node_cache_decorator:
         state.render_node = node_cache_decorator(state.render_node)
         state.node_read_time = node_cache_decorator(state.node_read_time)
+        # caching get_soup() saves less than .1s, don't bother
 
-    # if instead of endpoint_info only we want to check for everything,
-    # we'll have to have a *Checker for main+feed,
-    # and one for each feed+tag combo for which we generate feeds
-
-    state.link_checker = link_checker = LinkChecker(state, _EndpointInfo())
+    state.link_checker = link_checker = LinkChecker(state)
     if node_cache_decorator:
         link_checker.get_fragments = node_cache_decorator(link_checker.get_fragments)
         link_checker.get_internal_links = node_cache_decorator(
             link_checker.get_internal_links
         )
 
-    state.rendering_checker = rendering_checker = RenderingChecker(
-        state, _EndpointInfo()
-    )
+    rendering_checker = RenderingChecker(state)
     # nothing to cache for RenderingChecker? nothing to cache...
 
+    state.checker = MetaChecker(state, [link_checker, rendering_checker])
+
     app.extensions['state'] = state
+
+
+warnings.filterwarnings(
+    'ignore', message='No parser was explicitly specified', module='gen.app'
+)
 
 
 @dataclass
@@ -448,8 +437,8 @@ class _NodeState:
 
     _app: Flask
     thingie: Thingie
-    link_checker: LinkChecker = field(init=False, default=None)
-    rendering_checker: RenderingChecker = field(init=False, default=None)
+    checker: MetaChecker = None
+    link_checker: LinkChecker = None
 
     def render_node(self, id, real_endpoint, **values):
         # This is here because we need a method to cache.
@@ -460,7 +449,11 @@ class _NodeState:
 
     def node_read_time(self, id):
         # This is here because we need a method to cache.
-        return readtime.of_html(self.render_node(id, ('main', ())))
+        return readtime.of_html(self.render_node(id, EndpointInfo()))
+
+    def get_soup(self, id, real_endpoint):
+        # This is here because we need a method to cache.
+        return bs4.BeautifulSoup(self.render_page(id, real_endpoint))
 
     def _node_context(self, id, values=None):
         url = self.url_for_node(id, **(values or {}))
@@ -511,7 +504,6 @@ def create_app(
     project_root,
     *,
     project_url=None,
-    enable_checks=True,
     node_cache_decorator=None,
 ):
     app = Flask(
@@ -530,9 +522,6 @@ def create_app(
 
     app.register_blueprint(main_bp)
     app.register_blueprint(feed_bp, url_prefix='/_feed')
-
-    if enable_checks:
-        app.register_blueprint(check_bp, url_prefix='/_check')
 
     init_node_state(app, node_cache_decorator)
 

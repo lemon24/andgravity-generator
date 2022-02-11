@@ -111,11 +111,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
     from .app import create_app
     from jinja2 import FileSystemBytecodeCache
 
-    app = create_app(
-        project,
-        enable_checks=False,
-        node_cache_decorator=node_cache_decorator,
-    )
+    app = create_app(project, node_cache_decorator=node_cache_decorator)
 
     if cache_option:
         jinja_cache_path = os.path.join(project, '.gen/cache/jinja')
@@ -149,20 +145,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
 
     # TODO: maybe FREEZER_IGNORE_404_NOT_FOUND, so we don't fail fast for broken links (and get a full error report later)?
 
-    errors = {}
-    for id, urls in app.extensions['state'].link_checker.check_internal_links():
-        id_errors = {
-            url: data['error'] for url, data in urls.items() if data.get('error')
-        }
-        if id_errors:
-            errors.setdefault(id, {})['internal-links'] = id_errors
-    for id, id_errors in app.extensions[
-        'state'
-    ].rendering_checker.check_markdown_errors():
-        if id_errors:
-            errors.setdefault(id, {})['markdown'] = id_errors
-
-    if errors:
+    if errors := dict(app.extensions['state'].checker.check_all()):
         errors_str = yaml.safe_dump(errors)
         raise click.ClickException(f"Some checks failed:\n\n{errors_str}\n")
 
