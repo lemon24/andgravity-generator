@@ -1,3 +1,7 @@
+"""
+Data model stuff.
+
+"""
 import os.path
 from dataclasses import dataclass
 from functools import cached_property
@@ -6,7 +10,7 @@ import yaml
 
 
 @dataclass
-class Thingie:
+class Storage:
     path: str
 
     # TODO: pluggable loader
@@ -124,17 +128,17 @@ class Thingie:
 @dataclass
 class Page:
     id: str
-    thingie: Thingie
+    _storage: Storage
 
     # TODO: required attributes, schema
 
     @cached_property
     def meta(self):
-        return self.thingie.get_page_metadata(self.id)
+        return self._storage.get_page_metadata(self.id)
 
     @cached_property
     def content(self):
-        return self.thingie.get_page_content(self.id)
+        return self._storage.get_page_content(self.id)
 
     @property
     def title(self):

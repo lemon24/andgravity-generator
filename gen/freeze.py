@@ -4,9 +4,9 @@ import os.path
 import flask_frozen
 from flask import url_for
 
-from .app import EndpointInfo
 from .app import get_state
-from .app import get_thingie
+from .app import get_storage
+from .caching import EndpointInfo
 
 
 class GitHubPagesFreezer(flask_frozen.Freezer):
@@ -40,19 +40,19 @@ def make_freezer(app):
 
     @freezer.register_generator
     def page():
-        for id in get_thingie().get_page_ids(discoverable=None):
+        for id in get_storage().get_page_ids(discoverable=None):
             yield 'main.page', {'id': id}
 
     @freezer.register_generator
     def feed():
-        for page in get_thingie().get_pages(discoverable=None):
+        for page in get_storage().get_pages(discoverable=None):
             if page.has_feed:
                 yield 'feed.feed', {'id': page.id}
 
     @freezer.register_generator
     def file():
         # only yield linked files
-        for id in get_thingie().get_page_ids(discoverable=None):
+        for id in get_storage().get_page_ids(discoverable=None):
             for link in (
                 get_state().link_checker.get_internal_links(id, EndpointInfo()).values()
             ):
@@ -61,8 +61,8 @@ def make_freezer(app):
 
     @freezer.register_generator
     def tag_feed():
-        for id in get_thingie().get_page_ids(discoverable=None):
-            page = get_thingie().get_page(id)
+        for id in get_storage().get_page_ids(discoverable=None):
+            page = get_storage().get_page(id)
             for tags in page.tag_feeds:
                 yield 'feed.tag_feed', {'id': id, 'tags': tags}
 

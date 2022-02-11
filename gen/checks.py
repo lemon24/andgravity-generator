@@ -2,10 +2,6 @@ from dataclasses import dataclass
 from typing import NamedTuple
 from urllib.parse import urlparse
 
-import bs4
-
-from .core import Thingie
-
 
 class InternalLink(NamedTuple):
     endpoint: str
@@ -13,16 +9,9 @@ class InternalLink(NamedTuple):
     fragment: str
 
 
-"""
-def cache_node_methods(self, cache_decorator):
-    for name in self.cacheable_node_methods:
-        setattr(self, name, cache_decorator(getattr(self, name)))
-"""
-
-
 @dataclass
 class MetaChecker:
-    state: 'gen.app._NodeState'
+    state: 'gen.cache.NodeState'
     checkers: 'list[Checker]'
 
     def check(self, id, endpoint):
@@ -39,7 +28,7 @@ class MetaChecker:
         # we'll have one for main+feed,
         # and one for each feed+tag combo for which we generate feeds
 
-        for id in self.state.thingie.get_page_ids(hidden=None, discoverable=None):
+        for id in self.state.storage.get_page_ids(hidden=None, discoverable=None):
             errors = self.check(id, endpoint)
             if errors:
                 yield id, errors
@@ -47,7 +36,7 @@ class MetaChecker:
 
 @dataclass
 class LinkChecker:
-    state: 'gen.app._NodeState'
+    state: 'gen.cache.NodeState'
 
     def get_fragments(self, id, endpoint):
         soup = self.state.get_soup(id, endpoint)
@@ -101,9 +90,8 @@ class LinkChecker:
             error = None
             target_id = link.args['id']
 
-            # TODO: should this be per-endpoint-info?
             try:
-                self.state.thingie.get_page(target_id)
+                self.state.storage.get_page(target_id)
             except FileNotFoundError:
                 error = "node not found"
 
@@ -131,7 +119,7 @@ class LinkChecker:
 
 @dataclass
 class RenderingChecker:
-    state: 'gen.app._NodeState'
+    state: 'gen.cache.NodeState'
 
     def check(self, id, endpoint):
         soup = self.state.get_soup(id, endpoint)

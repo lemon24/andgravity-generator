@@ -2,7 +2,6 @@ import contextlib
 import functools
 import json
 import os.path
-import pathlib
 import subprocess
 import threading
 import webbrowser
@@ -10,10 +9,10 @@ import webbrowser
 import click
 import yaml
 
-import gen
-from .checks import LinkChecker
-from .core import Thingie
+from .caching import invalidate_cache
+from .caching import make_node_cache_decorator
 from .freeze import make_freezer
+from .storage import Storage
 
 
 @click.group()
@@ -91,7 +90,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
             raise click.Abort()
 
     content_root = os.path.join(project, 'content')
-    thingie = Thingie(content_root)
+    storage = Storage(content_root)
 
     def log(*args):
         if verbose:
@@ -102,9 +101,8 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
 
         cache = diskcache.Cache(os.path.join(project, '.gen/cache/data'))
         ctx.call_on_close(cache.close)
-        invalidate_cache(project, thingie, cache)
+        invalidate_cache(project, storage, cache)
         node_cache_decorator = make_node_cache_decorator(cache, log)
-
     else:
         node_cache_decorator = functools.lru_cache
 
@@ -155,7 +153,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
     with open(os.path.join(outdir, '.nojekyll'), 'w'):
         pass
 
-    cname = thingie.get_page('index').meta.get('project-cname')
+    cname = storage.get_page('index').meta.get('project-cname')
     if cname:
         with open(os.path.join(outdir, 'CNAME'), 'w') as f:
             f.write(cname + '\n')
@@ -174,63 +172,6 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
         subprocess.run(['git', '-C', outdir, 'add', '--all'])
         subprocess.run(['git', '-C', outdir, 'commit', '-m', "deploy"])
         subprocess.run(['git', '-C', outdir, 'push'])
-
-
-def make_node_cache_decorator(cache, log):
-    def node_cache_decorator(fn):
-        @functools.lru_cache
-        @functools.wraps(fn)
-        def wrapper(id, *args):
-            key = (f'{fn.__module__}.{fn.__qualname__}', id) + args
-
-            rv = cache.get(key)
-            if rv is not None:
-                log('hit ', *key)
-                return rv
-
-            log('miss', *key)
-
-            rv = fn(id, *args)
-            cache.set(key, rv, tag=f'node:{id}')
-            return rv
-
-        return wrapper
-
-    return node_cache_decorator
-
-
-def invalidate_cache(project, thingie, cache):
-    content_root = os.path.join(project, 'content')
-
-    old_mtimes = cache.get('mtimes', {})
-    new_mtimes = {}
-
-    def check_mtime(key, path, glob):
-        old_mtime = old_mtimes.get(key, 0)
-        new_mtime = old_mtime
-        for path in pathlib.Path(path).glob(glob):
-            new_mtime = max(new_mtime, path.stat().st_mtime)
-        if new_mtime > old_mtime:
-            new_mtimes[key] = new_mtime
-
-    check_mtime('dir:gen', gen.__path__[0], '**/*.py')
-    check_mtime('dir:templates', os.path.join(project, 'templates'), '**/*')
-
-    for id, path in thingie.get_page_paths():
-        check_mtime(f'node:{id}', content_root, path)
-
-    if new_mtimes:
-        if any(key.startswith('dir:') for key in new_mtimes):
-            cache.clear(retry=True)
-        else:
-            for key in new_mtimes:
-                assert key.startswith('node:'), key
-                cache.evict(key, retry=False)
-
-        mtimes = old_mtimes.copy()
-        mtimes.update(new_mtimes)
-
-        cache.set('mtimes', mtimes)
 
 
 if __name__ == '__main__':

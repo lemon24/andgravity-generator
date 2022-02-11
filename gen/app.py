@@ -1,23 +1,18 @@
 import functools
 import ntpath
 import os.path
-import warnings
 from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
 from itertools import chain
-from typing import NamedTuple
 from urllib.parse import urlparse
 
-import bs4
 import feedgen.ext.base
 import feedgen.feed
 import flask
 import humanize
 import jinja2
 import markupsafe
-import readtime
-import soupsieve.util
 import yaml
 from flask import abort
 from flask import Blueprint
@@ -29,14 +24,12 @@ from flask import request
 from flask import Response
 from flask import send_from_directory
 from flask import url_for
-from werkzeug.exceptions import NotFound
 from werkzeug.routing import BaseConverter
 
-from .checks import LinkChecker
-from .checks import MetaChecker
-from .checks import RenderingChecker
-from .core import Thingie
+from .caching import EndpointInfo
+from .caching import init_node_state
 from .markdown import make_markdown
+from .storage import Storage
 
 
 # BEGIN main blueprint
@@ -53,9 +46,9 @@ def get_state():
 
 
 @main_bp.app_template_global()
-def get_thingie():
+def get_storage():
     # for convenience
-    return get_state().thingie
+    return get_state().storage
 
 
 @main_bp.app_template_global()
@@ -77,11 +70,6 @@ def render_node(id=None):
     finally:
         if endpoint_info:
             g.endpoint_info_stack.pop()
-
-
-class EndpointInfo(NamedTuple):
-    endpoint: "Literal['main', 'feed']" = 'main'
-    tags: tuple = ()
 
 
 def get_real_endpoint(endpoint_info_stack=None):
@@ -112,7 +100,7 @@ def url_for_node(id=None, **values):
 
 
 def get_project_url():
-    return current_app.config.get('PROJECT_URL') or get_thingie().get_project_url()
+    return current_app.config.get('PROJECT_URL') or get_storage().get_project_url()
 
 
 def abs_page_url_for(id):
@@ -123,7 +111,7 @@ def abs_page_url_for(id):
 @main_bp.route('/<id>')
 def page(id):
     try:
-        page = get_thingie().get_page(id)
+        page = get_storage().get_page(id)
     # TODO: be more precise in what we're catching
     except FileNotFoundError:
         return abort(404)
@@ -168,14 +156,14 @@ def feed(id):
 
 @feed_bp.route('/<id>/_tags/<list:tags>.xml')
 def tag_feed(id, tags):
-    # TODO: check tags exist in thingie
+    # TODO: check tags exist in storage
     # TODO: check tags are in canonical order
     return make_feed_response(id, tags)
 
 
 def make_feed_response(*args, **kwargs):
     try:
-        fg = make_feed(get_thingie(), *args, **kwargs)
+        fg = make_feed(get_storage(), *args, **kwargs)
     # TODO: be more precise in what we're catching
     # (both exc type, and that it's for id and not other node)
     except FileNotFoundError:
@@ -188,9 +176,9 @@ def make_feed_response(*args, **kwargs):
     )
 
 
-def make_feed(thingie, id, tags=None):
-    page = thingie.get_page(id)
-    index = thingie.get_page('index')
+def make_feed(storage, id, tags=None):
+    page = storage.get_page(id)
+    index = storage.get_page('index')
 
     fg = feedgen.feed.FeedGenerator()
     # TODO: link to tag page once we have one
@@ -216,7 +204,7 @@ def make_feed(thingie, id, tags=None):
     )
 
     # sort ascending, because feedgen reverses the entries
-    children = list(thingie.get_children(id, sort='published', tags=tags))
+    children = list(storage.get_children(id, sort='published', tags=tags))
 
     if not children:
         feed_updated = '1970-01-01T00:00:00Z'
@@ -344,7 +332,7 @@ def load_literalinclude(url):
     path = url_parsed.path.lstrip('/')
 
     # TODO: check path doesn't go above <project_root>/files/<id>
-    # TODO: this is cacheable, and should be done by thingie
+    # TODO: this is cacheable, and should be done by storage
 
     actual_path = os.path.join(current_app.config['PROJECT_ROOT'], 'files', id, path)
     with open(actual_path) as f:
@@ -356,7 +344,7 @@ def render_snippet(snippet, text, options):
         os.path.join('snippets', snippet + '.html')
     )
 
-    page = get_thingie().get_page(request.view_args['id'])
+    page = get_storage().get_page(request.view_args['id'])
 
     return render_template(
         template,
@@ -375,107 +363,6 @@ markdown = make_markdown(
     load_literalinclude=load_literalinclude,
     render_snippet=render_snippet,
 )
-
-
-# BEGIN node state
-
-
-def init_node_state(app, node_cache_decorator=None):
-    """Store node-related state on the app.
-
-    Implemented as a Flask extension, to avoid subclassing /
-    setting attributes directly on the Flask instance.
-
-    """
-    project_root = app.config['PROJECT_ROOT']
-
-    thingie = Thingie(os.path.join(project_root, 'content'))
-    if node_cache_decorator:
-        thingie.get_page_metadata = node_cache_decorator(thingie.get_page_metadata)
-        thingie.get_page_content = node_cache_decorator(thingie.get_page_content)
-
-    state = _NodeState(app, thingie)
-    if node_cache_decorator:
-        state.render_node = node_cache_decorator(state.render_node)
-        state.node_read_time = node_cache_decorator(state.node_read_time)
-        # caching get_soup() saves less than .1s, don't bother
-
-    state.link_checker = link_checker = LinkChecker(state)
-    if node_cache_decorator:
-        link_checker.get_fragments = node_cache_decorator(link_checker.get_fragments)
-        link_checker.get_internal_links = node_cache_decorator(
-            link_checker.get_internal_links
-        )
-
-    rendering_checker = RenderingChecker(state)
-    # nothing to cache for RenderingChecker? nothing to cache...
-
-    state.checker = MetaChecker(state, [link_checker, rendering_checker])
-
-    app.extensions['state'] = state
-
-
-warnings.filterwarnings(
-    'ignore', message='No parser was explicitly specified', module='gen.app'
-)
-
-
-@dataclass
-class _NodeState:
-    """Node-related state for an app.
-
-    Provides cacheable methods, without having to directly expose the whole app.
-
-    The circular dependency between the app and this state is probably OK.
-    This exists to limit the API others (e.g. LinkChecker) should depend on.
-
-    For now, it's OK to have one of everything per thread.
-    If we change our mind, we can make the various attributes
-    properties that set/return state from g.
-
-    """
-
-    _app: Flask
-    thingie: Thingie
-    checker: MetaChecker = None
-    link_checker: LinkChecker = None
-
-    def render_node(self, id, real_endpoint, **values):
-        # This is here because we need a method to cache.
-        # real_endpoint is set by render_node() for cache invalidation.
-        page = self.thingie.get_page(id)
-        with self._node_context(id, values=values):
-            return markupsafe.Markup(markdown(page.content))
-
-    def node_read_time(self, id):
-        # This is here because we need a method to cache.
-        return readtime.of_html(self.render_node(id, EndpointInfo()))
-
-    def get_soup(self, id, real_endpoint):
-        # This is here because we need a method to cache.
-        return bs4.BeautifulSoup(self.render_page(id, real_endpoint))
-
-    def _node_context(self, id, values=None):
-        url = self.url_for_node(id, **(values or {}))
-        return self._app.test_request_context(url)
-
-    def render_page(self, id, real_endpoint):
-        # real_endpoint is set for cache invalidation.
-        with self._app.test_client() as client:
-            rv = client.get(self.url_for_node(id))
-            assert rv.status_code == 200, rv.status
-            return rv.get_data(as_text=True)
-
-    def url_for_node(self, id, **values):
-        with self._app.test_request_context():
-            return url_for_node(id, **values)
-
-    def match_url(self, *args, **kwargs):
-        ctx = self._app.test_request_context()
-        try:
-            return ctx.url_adapter.match(*args, **kwargs)
-        except NotFound as e:
-            return None
 
 
 # BEGIN app creation

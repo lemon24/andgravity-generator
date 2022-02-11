@@ -2,7 +2,7 @@ import io
 
 import pytest
 
-from gen.core import read_metadata
+from gen.storage import read_metadata
 
 
 def test_read_metadata():
