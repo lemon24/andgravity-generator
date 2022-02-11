@@ -11,12 +11,13 @@ ROOT = Path(__file__).parent
 
 
 def walk(path):
-    for root, dirs, files in os.walk(path):
+    for root, _, files in os.walk(path):
         for file in files:
             yield os.path.relpath(os.path.join(root, file), path)
 
+
 def clean_trailing_whitespace(text):
-    return ''.join(l.rstrip() + '\n' for l in text.rstrip().splitlines())
+    return ''.join(line.rstrip() + '\n' for line in text.rstrip().splitlines())
 
 
 def test_freeze(tmp_path, subtests):
@@ -56,9 +57,10 @@ one:
   markdown:
   - 'Unsupported directive: unknown-directive'
   - 'could not render snippet ''unknown-snippet'': TemplateNotFound: snippets/unknown-snippet.html'
-"""
+"""  # noqa
 
 # including the error messages is a bit brittle, but eh...
+
 
 @pytest.mark.filterwarnings('ignore:Nothing frozen')
 def test_freeze_checks(tmp_path, subtests):

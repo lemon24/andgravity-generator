@@ -48,16 +48,16 @@ class Storage:
         if sort != 'id':
             filters.append(lambda p: sort in p.meta)
 
-        keep = lambda p: invert is not all(f(p) for f in filters)
+        keep = lambda p: invert is not all(f(p) for f in filters)  # noqa
 
         rv = filter(keep, map(self.get_page, self.get_all_page_ids()))
 
         if sort == 'id' or invert:
-            key = lambda p: p.id
+            key = lambda p: p.id  # noqa
         else:
             if sort not in ('published',):
                 raise ValueError(f"unknown sort: {sort!r}")
-            key = lambda p: p.meta[sort]
+            key = lambda p: p.meta[sort]  # noqa
 
         rv = sorted(rv, key=key, reverse=reverse)
 
@@ -85,7 +85,7 @@ class Storage:
 
     def get_page_content(self, id):
         with open(os.path.join(self.path, id) + '.md') as f:
-            for line in read_metadata(f):
+            for _line in read_metadata(f):
                 pass
             return f.read()
 

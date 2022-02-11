@@ -1,8 +1,6 @@
 import ntpath
-import os.path
 
 import flask_frozen
-from flask import url_for
 
 from .app import get_state
 from .app import get_storage

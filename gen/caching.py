@@ -37,7 +37,7 @@ class NodeState:
 
     """
 
-    _app: 'Flask'
+    _app: 'Flask'  # noqa
     storage: 'Storage'
     checker: MetaChecker = None
     link_checker: LinkChecker = None
@@ -80,7 +80,7 @@ class NodeState:
         ctx = self._app.test_request_context()
         try:
             return ctx.url_adapter.match(*args, **kwargs)
-        except NotFound as e:
+        except NotFound:
             return None
 
 
@@ -129,11 +129,11 @@ def init_node_state(app, node_cache_decorator=None):
 
 
 class EndpointInfo(NamedTuple):
-    endpoint: "Literal['main', 'feed']" = 'main'
+    endpoint: "Literal['main', 'feed']" = 'main'  # noqa
     tags: tuple = ()
 
 
-def make_node_cache_decorator(cache: 'diskcache.Cache', log):
+def make_node_cache_decorator(cache: 'diskcache.Cache', log):  # noqa
     def node_cache_decorator(fn):
         @functools.lru_cache
         @functools.wraps(fn)

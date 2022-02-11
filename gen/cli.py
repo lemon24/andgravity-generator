@@ -1,6 +1,5 @@
 import contextlib
 import functools
-import json
 import os.path
 import subprocess
 import threading
@@ -21,7 +20,7 @@ from .storage import Storage
     type=click.Path(exists=True, file_okay=False, resolve_path=True),
     default='.',
     show_default=True,
-    help=f"Project root.",
+    help="Project root.",
 )
 @click.pass_context
 def cli(ctx, project):
@@ -34,7 +33,6 @@ def cli(ctx, project):
 @click.option('--open/--no-open', help="Open a browser.")
 @click.pass_obj
 def serve(project, host, port, open):
-    from werkzeug.serving import run_simple
     from .app import create_app
 
     # TODO: threads, reload, debug
@@ -141,7 +139,8 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
         for page in pages:
             log('done', page.path)
 
-    # TODO: maybe FREEZER_IGNORE_404_NOT_FOUND, so we don't fail fast for broken links (and get a full error report later)?
+    # TODO: maybe FREEZER_IGNORE_404_NOT_FOUND, so we don't fail fast for broken links
+    # (and get a full error report later)
 
     if errors := dict(app.extensions['state'].checker.check_all()):
         errors_str = yaml.safe_dump(errors)

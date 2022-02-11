@@ -11,8 +11,8 @@ class InternalLink(NamedTuple):
 
 @dataclass
 class MetaChecker:
-    state: 'gen.cache.NodeState'
-    checkers: 'list[Checker]'
+    state: 'gen.cache.NodeState'  # noqa
+    checkers: 'list[Checker]'  # noqa
 
     def check(self, id, endpoint):
         rv = {}
@@ -36,7 +36,7 @@ class MetaChecker:
 
 @dataclass
 class LinkChecker:
-    state: 'gen.cache.NodeState'
+    state: 'gen.cache.NodeState'  # noqa
 
     def get_fragments(self, id, endpoint):
         soup = self.state.get_soup(id, endpoint)
@@ -60,7 +60,7 @@ class LinkChecker:
             elif element.name == 'img':
                 url = element['src']
             else:
-                assert False, f"unexpected element: {element!r}"
+                assert False, f"unexpected element: {element!r}"  # noqa
 
             if url in rv:
                 continue
@@ -119,7 +119,7 @@ class LinkChecker:
 
 @dataclass
 class RenderingChecker:
-    state: 'gen.cache.NodeState'
+    state: 'gen.cache.NodeState'  # noqa
 
     def check(self, id, endpoint):
         soup = self.state.get_soup(id, endpoint)

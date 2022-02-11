@@ -2,7 +2,6 @@ import os.path
 from glob import glob
 from textwrap import dedent
 
-import mistune
 import pytest
 
 from gen.markdown import make_markdown
@@ -46,4 +45,7 @@ def render_snippet(value, text, options):
 
 def test_parts(md_html):
     md, html = md_html
-    assert make_markdown([build_node_url, build_file_url], load_lines, render_snippet)(md) == html
+    assert (
+        make_markdown([build_node_url, build_file_url], load_lines, render_snippet)(md)
+        == html
+    )

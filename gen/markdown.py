@@ -132,9 +132,9 @@ def render_highlighed_code(code, options):
 
     linenos_pre_index = html.index('<pre>')
     try:
-        code_pre_index = html.index('<pre>', linenos_pre_index + 1)
+        code_pre_index = html.index('<pre>', linenos_pre_index + 1)  # noqa
     except ValueError:
-        code_pre_index, linenos_pre_index = linenos_pre_index, None
+        code_pre_index, linenos_pre_index = linenos_pre_index, None  # noqa
 
     # wrapcode doesn't work for the linenos, so we add it by hand
     if linenos_pre_index:
@@ -283,9 +283,10 @@ class LiteralInclude(Directive):
         if lines_option:
             only_lines = parselinenos(lines_option, len(lines))
 
-            line_distances = {
+            line_distances = {  # noqa
                 only_lines[i + 1] - only_lines[i] for i in range(len(only_lines) - 1)
             }
+            # TODO: use line_distances somehow (what was it for?)
 
             # TODO: handle indexerror
             lines = [lines[i] for i in only_lines]
@@ -308,7 +309,7 @@ class LiteralInclude(Directive):
         if md.renderer.NAME == 'html':
             md.renderer.register('literalinclude', render_html_literalinclude)
         elif md.renderer.NAME == 'ast':
-            assert False, "no AST renderer for literalinclude"
+            raise NotImplementedError("no AST renderer for literalinclude")
 
 
 def render_html_literalinclude(text, options):
