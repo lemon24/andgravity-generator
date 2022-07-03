@@ -1,4 +1,5 @@
 import os.path
+import textwrap
 from collections import deque
 from urllib.parse import urlparse
 
@@ -398,6 +399,7 @@ def create_app(
         app.config['PROJECT_URL'] = project_url
 
     app.jinja_env.undefined = jinja2.StrictUndefined
+    app.jinja_env.filters['dedent'] = textwrap.dedent
     app.url_map.converters['list'] = ListConverter
 
     app.register_blueprint(main_bp)
