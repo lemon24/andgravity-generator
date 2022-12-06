@@ -50,7 +50,7 @@ class Storage:
 
         keep = lambda p: invert is not all(f(p) for f in filters)  # noqa
 
-        rv = filter(keep, map(self.get_page, self.get_all_page_ids()))
+        rv = filter(keep, map(self._get_page, self.get_all_page_ids()))
 
         if sort == 'id' or invert:
             key = lambda p: p.id  # noqa
@@ -61,7 +61,7 @@ class Storage:
 
         rv = sorted(rv, key=key, reverse=reverse)
 
-        return iter(rv)
+        return list(rv)
 
     def get_page_ids(self, *, hidden=False, discoverable=True, tags=None, invert=False):
         # TODO: this is inefficient
@@ -89,10 +89,14 @@ class Storage:
                 pass
             return f.read()
 
-    def get_page(self, id):
+    def _get_page(self, id):
+        # used internally, so we can tell external get_page() calls apart
         if not self.page_exists(id):
             raise FileNotFoundError(os.path.join(self.path, id) + '.md')  # :(
         return Page(id, self)
+
+    def get_page(self, id):
+        return self._get_page(id)
 
     def get_children(
         self,
@@ -122,7 +126,7 @@ class Storage:
             yield child
 
     def get_project_url(self):
-        return self.get_page('index').meta['project-url']
+        return self._get_page('index').meta['project-url']
 
 
 @dataclass

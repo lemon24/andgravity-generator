@@ -125,7 +125,76 @@ def init_node_state(app, node_cache_decorator=None):
 
     state.checker = MetaChecker(state, [link_checker, rendering_checker])
 
+    target = TreeTarget()
+    # state.render_node = intercept_node(state.render_node, target)
+    # state.render_page = intercept_node(state.render_page, target)
+    app.view_functions['main.page'] = intercept_node(
+        app.view_functions['main.page'], target
+    )
+    storage.get_page = intercept(storage.get_page, on_return=target.page)
+    storage.get_pages = intercept(storage.get_pages, on_return=target.pages)
+    # TODO: actually do something with target
+
     app.extensions['state'] = state
+
+
+class TreeTarget:
+    def __init__(self):
+        self.nodes = {}
+        self.stack = []
+        self.debug = False
+
+    def start_node(self, fn, id, *_, **__):
+        if self.debug:
+            print(f"{'  ' * len(self.stack)}{fn.__name__}({id})")
+        self.stack.append(id)
+
+    def end_node(self, fn, _):
+        self.stack.pop()
+        if self.debug and not self.stack:
+            import yaml, copy  # noqa
+
+            nodes = copy.deepcopy(self.nodes)
+            for k, v in nodes.items():
+                v.discard(k)
+            nodes = {k: sorted(v) for k, v in nodes.items()}
+            print()
+            print(yaml.dump(nodes))
+            print()
+
+    def page(self, fn, page):
+        if not self.stack:
+            return
+        self.nodes.setdefault(self.stack[-1], set()).add(page.id)
+        if self.debug:
+            print(f"{'  ' * len(self.stack)}{fn.__name__} -> {page.id}")
+
+    def pages(self, fn, pages):
+        if not self.stack:
+            return
+        self.nodes.setdefault(self.stack[-1], set()).update(p.id for p in pages)
+        if self.debug:
+            print(
+                f"{'  ' * len(self.stack)}{fn.__name__} -> "
+                f"{', '.join(p.id for p in pages)}"
+            )
+
+
+def intercept(fn, on_called=None, on_return=None):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if on_called:
+            on_called(fn, *args, **kwargs)
+        rv = fn(*args, **kwargs)
+        if on_return:
+            on_return(fn, rv)
+        return rv
+
+    return wrapper
+
+
+def intercept_node(fn, target):
+    return intercept(fn, on_called=target.start_node, on_return=target.end_node)
 
 
 class EndpointInfo(NamedTuple):
@@ -165,7 +234,7 @@ def invalidate_cache(project, storage, cache):
     def check_mtime(key, path, glob):
         old_mtime = old_mtimes.get(key, 0)
         new_mtime = old_mtime
-        for path in pathlib.Path(path).glob(glob):
+        for path in pathlib.Path(path).glob(glob):  # noqa
             new_mtime = max(new_mtime, path.stat().st_mtime)
         if new_mtime > old_mtime:
             new_mtimes[key] = new_mtime
