@@ -41,6 +41,7 @@ class NodeState:
     storage: 'Storage'
     checker: MetaChecker = None
     link_checker: LinkChecker = None
+    dependency_tracker: 'DependecyTracker' = None
 
     def render_node(self, id, real_endpoint, **values):
         # This is here because we need a method to cache.
@@ -125,57 +126,48 @@ def init_node_state(app, node_cache_decorator=None):
 
     state.checker = MetaChecker(state, [link_checker, rendering_checker])
 
-    target = TreeTarget()
-    # state.render_node = intercept_node(state.render_node, target)
-    # state.render_page = intercept_node(state.render_page, target)
+    state.dependency_tracker = dependency_tracker = DependecyTracker()
+    # we are only tracking dependencies during page rendering;
+    # if in the feed there are different dependencies
+    # (e.g. because of endpoint-dependent logic in snippets),
+    # those won't be tracked
     app.view_functions['main.page'] = intercept_node(
-        app.view_functions['main.page'], target
+        app.view_functions['main.page'], dependency_tracker
     )
-    storage.get_page = intercept(storage.get_page, on_return=target.page)
-    storage.get_pages = intercept(storage.get_pages, on_return=target.pages)
-    # TODO: actually do something with target
+    storage.get_page = intercept(storage.get_page, on_return=dependency_tracker.page)
+    storage.get_pages = intercept(storage.get_pages, on_return=dependency_tracker.pages)
 
     app.extensions['state'] = state
 
 
-class TreeTarget:
-    def __init__(self):
-        self.nodes = {}
-        self.stack = []
-        self.debug = False
+class DependecyTracker:
+    def __init__(self, debug=False):
+        self.dependencies = {}
+        self.debug = debug
+        self._stack = []
 
     def start_node(self, fn, id, *_, **__):
         if self.debug:
-            print(f"{'  ' * len(self.stack)}{fn.__name__}({id})")
-        self.stack.append(id)
+            print(f"{'  ' * len(self._stack)}{fn.__name__}({id})")
+        self._stack.append(id)
 
     def end_node(self, fn, _):
-        self.stack.pop()
-        if self.debug and not self.stack:
-            import yaml, copy  # noqa
-
-            nodes = copy.deepcopy(self.nodes)
-            for k, v in nodes.items():
-                v.discard(k)
-            nodes = {k: sorted(v) for k, v in nodes.items()}
-            print()
-            print(yaml.dump(nodes))
-            print()
+        self._stack.pop()
 
     def page(self, fn, page):
-        if not self.stack:
+        if not self._stack:
             return
-        self.nodes.setdefault(self.stack[-1], set()).add(page.id)
+        self.dependencies.setdefault(self._stack[-1], set()).add(page.id)
         if self.debug:
-            print(f"{'  ' * len(self.stack)}{fn.__name__} -> {page.id}")
+            print(f"{'  ' * len(self._stack)}{fn.__name__} -> {page.id}")
 
     def pages(self, fn, pages):
-        if not self.stack:
+        if not self._stack:
             return
-        self.nodes.setdefault(self.stack[-1], set()).update(p.id for p in pages)
+        self.dependencies.setdefault(self._stack[-1], set()).update(p.id for p in pages)
         if self.debug:
             print(
-                f"{'  ' * len(self.stack)}{fn.__name__} -> "
+                f"{'  ' * len(self._stack)}{fn.__name__} -> "
                 f"{', '.join(p.id for p in pages)}"
             )
 
@@ -245,15 +237,35 @@ def invalidate_cache(project, storage, cache):
     for id, path in storage.get_page_paths():
         check_mtime(f'node:{id}', content_root, path)
 
+    to_evict = set()
+
     if new_mtimes:
         if any(key.startswith('dir:') for key in new_mtimes):
             cache.clear(retry=True)
         else:
+            dependents = invert_dependencies(cache.get('dependencies', {}))
+
             for key in new_mtimes:
                 assert key.startswith('node:'), key
+                to_evict.add(key)
+                to_evict.update(
+                    f'node:{d}' for d in dependents.get(key.partition(':')[2], ())
+                )
+
+            for key in to_evict:
                 cache.evict(key, retry=False)
 
         mtimes = old_mtimes.copy()
         mtimes.update(new_mtimes)
 
         cache.set('mtimes', mtimes)
+
+    return {key.partition(':')[2] for key in to_evict}
+
+
+def invert_dependencies(dependencies):
+    rv = {}
+    for key, values in dependencies.items():
+        for value in values:
+            rv.setdefault(value, set()).add(key)
+    return rv

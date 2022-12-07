@@ -99,7 +99,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
 
         cache = diskcache.Cache(os.path.join(project, '.gen/cache/data'))
         ctx.call_on_close(cache.close)
-        invalidate_cache(project, storage, cache)
+        evicted_nodes = invalidate_cache(project, storage, cache)
         node_cache_decorator = make_node_cache_decorator(cache, log)
     else:
         node_cache_decorator = functools.lru_cache
@@ -138,6 +138,19 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
     with progressbar as pages:
         for page in pages:
             log('done', page.path)
+
+    if cache_option:
+        # TODO: this logic should be handled by the cache invalidator
+        dependencies = cache.get('dependencies', {})
+        for id in evicted_nodes:
+            dependencies.pop(id, None)
+        new_dependencies = app.extensions['state'].dependency_tracker.dependencies
+        for key, value in new_dependencies.items():
+            # we only update dependencies for evicted nodes
+            # (nodes that were not evicted are not re-rendered,
+            # so dependencies will be wrong for them)
+            dependencies.setdefault(key, value)
+        cache.set('dependencies', dependencies)
 
     # TODO: maybe FREEZER_IGNORE_404_NOT_FOUND, so we don't fail fast for broken links
     # (and get a full error report later)
