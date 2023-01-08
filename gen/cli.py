@@ -3,6 +3,7 @@ import functools
 import os.path
 import subprocess
 import threading
+import urllib.parse
 import webbrowser
 
 import click
@@ -104,7 +105,7 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
     else:
         node_cache_decorator = functools.lru_cache
 
-    from .app import create_app
+    from .app import create_app, get_project_url
     from jinja2 import FileSystemBytecodeCache
 
     app = create_app(project, node_cache_decorator=node_cache_decorator)
@@ -121,6 +122,14 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
     app.config['FREEZER_DESTINATION'] = outdir
     app.config['FREEZER_REDIRECT_POLICY'] = 'error'
     app.config['FREEZER_DESTINATION_IGNORE'] = ['.git*']
+
+    with app.test_request_context():
+        project_url = urllib.parse.urlparse(get_project_url())
+
+    # TODO: these should probably be per-freezer (don't want them for "local HTML")
+    app.config['SERVER_NAME'] = project_url.netloc
+    app.config['APPLICATION_ROOT'] = project_url.path or '/'
+    app.config['PREFERRED_URL_SCHEME'] = project_url.scheme
 
     # TODO: check for uncommited changes in outdir; also, probably pull
 

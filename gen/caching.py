@@ -126,6 +126,7 @@ def init_node_state(app, node_cache_decorator=None):
 
     state.checker = MetaChecker(state, [link_checker, rendering_checker])
 
+    # FIXME: this still doesn't account to a new page being added to the index list
     state.dependency_tracker = dependency_tracker = DependecyTracker()
     # we are only tracking dependencies during page rendering;
     # if in the feed there are different dependencies

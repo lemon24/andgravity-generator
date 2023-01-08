@@ -137,6 +137,11 @@ def markdown_filter(text):
 main_bp.add_app_template_filter(yaml.safe_dump, 'to_yaml')
 
 
+@main_bp.app_template_filter('percent_encode')
+def percent_encode(s, encoding="ascii"):
+    return ''.join([f'%{b:0>2x}' for b in s.encode(encoding)])
+
+
 # BEGIN feed blueprint
 
 
