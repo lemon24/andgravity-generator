@@ -44,6 +44,10 @@ def test_freeze(tmp_path, subtests):
                 expected = clean_trailing_whitespace(f.read())
             with output_dir.joinpath(file).open() as f:
                 output = clean_trailing_whitespace(f.read())
+
+            print('\n\n')
+            print(output)
+            print('\n\n')
             assert expected == output, file
 
 

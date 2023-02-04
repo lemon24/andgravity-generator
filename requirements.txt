@@ -4,7 +4,7 @@ frozen-flask
 mistune>=2
 python-slugify
 pyyaml
-pygments
+pygments>=2.12
 feedgen
 pytest
 pytest-subtests

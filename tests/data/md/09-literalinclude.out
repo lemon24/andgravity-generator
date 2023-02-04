@@ -14,21 +14,20 @@ five
 
 </code></pre></div>
 
-<table class="highlighttable code-container"><tr><td class="linenos"><div class="linenodiv"><pre class="code"><code><span class="normal">1</span>
+<div class="highlight code-container"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre class="code"><code><span class="normal">1</span>
 <span class="normal">2</span>
 <span class="normal">3</span>
 <span class="normal">4</span>
 <span class="normal">5</span>
-<span class="normal">6</span></code></pre></div></td><td class="code"><div class="highlight"><pre class="code" data-lang="Python"><span></span><code><span class="n">one</span>
+<span class="normal">6</span></code></pre></div></td><td class="code"><div><pre class="code" data-lang="Python"><span></span><code><span class="n">one</span>
 <span class="n">two</span>
 <span class="n">three</span>
 <span class="n">four</span>
 <span class="n">five</span>
 
-</code></pre></div>
-</td></tr></table>
-<table class="highlighttable code-container"><tr><td class="linenos"><div class="linenodiv"><pre class="code"><code><span class="normal">2</span>
-<span class="normal">3</span></code></pre></div></td><td class="code"><div class="highlight"><pre class="code" data-lang="Python"><span></span><code><span class="n">two</span>
+</code></pre></div></td></tr></table></div>
+
+<div class="highlight code-container"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre class="code"><code><span class="normal">2</span>
+<span class="normal">3</span></code></pre></div></td><td class="code"><div><pre class="code" data-lang="Python"><span></span><code><span class="n">two</span>
 <span class="n">three</span>
-</code></pre></div>
-</td></tr></table>
+</code></pre></div></td></tr></table></div>

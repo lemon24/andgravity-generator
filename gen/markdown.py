@@ -146,15 +146,10 @@ def render_highlighed_code(code, options):
     )
 
     # add .code-container to the outermost element
-    if linenos_pre_index:
-        html = html.replace(
-            '<table class="highlighttable">',
-            '<table class="highlighttable code-container">',
-        )
-    else:
-        html = html.replace(
-            '<div class="highlight">', '<div class="highlight code-container">'
-        )
+    # pygments >= 2.12 required
+    html = html.replace(
+        '<div class="highlight">', '<div class="highlight code-container">'
+    )
 
     return html
 

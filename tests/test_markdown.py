@@ -44,8 +44,8 @@ def render_snippet(value, text, options):
 
 
 def test_parts(md_html):
-    md, html = md_html
-    assert (
-        make_markdown([build_node_url, build_file_url], load_lines, render_snippet)(md)
-        == html
-    )
+    md, expected = md_html
+    actual = make_markdown(
+        [build_node_url, build_file_url], load_lines, render_snippet
+    )(md)
+    assert actual.rstrip() == expected.rstrip()
