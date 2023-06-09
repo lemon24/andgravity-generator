@@ -54,7 +54,17 @@ class NodeState:
 
     def node_read_time(self, id):
         # This is here because we need a method to cache.
-        return readtime.of_html(self.render_node(id, EndpointInfo()))
+
+        html = self.render_node(id, EndpointInfo())
+
+        # otherwise, we get a silent warning(?) like
+        #
+        #   encoding error : input conversion failed due to input error,
+        #   bytes 0x70 0x00 0x00 0x00
+        #
+        html = html.encode()
+
+        return readtime.of_html(html)
 
     def get_soup(self, id, real_endpoint):
         # This is here because we need a method to cache.
