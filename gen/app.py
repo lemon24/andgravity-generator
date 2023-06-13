@@ -1,3 +1,4 @@
+import datetime
 import os.path
 import textwrap
 from collections import deque
@@ -113,7 +114,8 @@ def page(id):
     template = current_app.jinja_env.select_template(
         [os.path.join('custom', id + '.html'), 'base.html']
     )
-    return render_template(template, page=page)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return render_template(template, page=page, now=now)
 
 
 @main_bp.route('/_file/<id>/<path:path>')
