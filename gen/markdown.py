@@ -1,3 +1,5 @@
+import re
+
 import mistune.directives
 from mistune import escape
 from mistune import escape_html
@@ -275,6 +277,7 @@ class LiteralInclude(Directive):
             }
 
         lines_option = options.pop('lines', '').strip()
+        ellipsis_option = options.pop('ellipsis', '').strip()
         if lines_option:
             only_lines = parselinenos(lines_option, len(lines))
 
@@ -283,8 +286,21 @@ class LiteralInclude(Directive):
             }
             # TODO: use line_distances somehow (what was it for?)
 
-            # TODO: handle indexerror
-            lines = [lines[i] for i in only_lines]
+            all_lines = lines
+            lines = []
+            prev_i = None
+            for i in only_lines:
+                # TODO: handle indexerror
+                line = all_lines[i]
+
+                # this messes with line numbers, a fix for that requires
+                # https://github.com/pygments/pygments/issues/2322
+                if ellipsis_option and prev_i is not None and i != prev_i + 1:
+                    indent = re.match(r'^\s*', line).group(0)
+                    lines.append(f'{indent}{ellipsis_option}\n')
+
+                lines.append(line)
+                prev_i = i
 
             options.setdefault('lineno-start', only_lines[0] + 1)
 

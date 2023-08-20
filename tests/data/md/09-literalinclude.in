@@ -8,3 +8,8 @@
 .. literalinclude:: file.py
     :linenos:
     :lines: 2-3
+
+.. literalinclude:: file
+    :lines: 1,3,5-
+    :linenos: no
+    :ellipsis: ...
