@@ -275,10 +275,11 @@ def build_page_url(url, text=None):
     # TODO: disallow query strings, port etc
 
     path = url_parsed.path.lstrip('/')
+    current_id = request.view_args['id']
     if path:
         id = path
     else:
-        id = request.view_args['id']
+        id = current_id
 
     kwargs = {}
     if url_parsed.fragment:
@@ -291,7 +292,7 @@ def build_page_url(url, text=None):
     if not text:
         text = id
 
-    return new_url, text
+    return new_url, text, 'internal' if id != current_id else 'anchor'
 
 
 def build_file_url(url, text=None):
@@ -315,7 +316,15 @@ def build_file_url(url, text=None):
 
     # TODO: disallow fragments, query string etc
 
-    return url_for("main.file", id=id, path=path), text
+    return url_for("main.file", id=id, path=path), text, 'attachment'
+
+
+def build_external_url(url, text=None):
+    """Mark HTTP(S) URLs as external."""
+    url_parsed = urlparse(url)
+    if url_parsed.scheme not in ('http', 'https'):
+        return None
+    return url, text, 'external'
 
 
 def load_literalinclude(url):
@@ -360,7 +369,7 @@ def render_snippet(snippet, text, options):
 # For now, we're OK with a global, non-configurable markdown instance.
 
 markdown = make_markdown(
-    url_rewriters=[build_page_url, build_file_url],
+    url_rewriters=[build_page_url, build_file_url, build_external_url],
     load_literalinclude=load_literalinclude,
     render_snippet=render_snippet,
 )

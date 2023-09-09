@@ -39,6 +39,12 @@ def build_file_url(url, text):
     return None
 
 
+def build_type_url(url, text):
+    if url.startswith('type:'):
+        return url.upper(), text or 'default', 'type'
+    return None
+
+
 def render_snippet(value, text, options):
     return f"snippet: {value}\noptions: {options}\ntext: {dedent(text)!r}"
 
@@ -46,6 +52,6 @@ def render_snippet(value, text, options):
 def test_parts(md_html):
     md, expected = md_html
     actual = make_markdown(
-        [build_node_url, build_file_url], load_lines, render_snippet
+        [build_node_url, build_file_url, build_type_url], load_lines, render_snippet
     )(md)
     assert actual.rstrip() == expected.rstrip()

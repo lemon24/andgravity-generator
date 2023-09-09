@@ -24,12 +24,12 @@
       <name>local</name>
       <email>local@example.com</email>
     </author>
-    <content type="html">&lt;p&gt;&lt;a href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href=""&gt;label&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href=""&gt;one&lt;/a&gt;&lt;/p&gt;
+    <content type="html">&lt;p&gt;&lt;a class="internal" href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="internal" href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="internal" href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="internal" href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="anchor" href=""&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="anchor" href=""&gt;one&lt;/a&gt;&lt;/p&gt;
 
 &lt;div&gt;
 snippet: test
@@ -58,10 +58,10 @@ endpoint info: feed;
     <id>https://example.com/attachments</id>
     <title>attachments</title>
     <updated>2020-01-01T00:00:00+00:00</updated>
-    <content type="html">&lt;p&gt;&lt;a href="/_file/attachments/linked.txt"&gt;attachment&lt;/a&gt;
-&lt;a href="http://example.com/"&gt;normal link&lt;/a&gt;
+    <content type="html">&lt;p&gt;&lt;a class="attachment" href="/_file/attachments/linked.txt"&gt;attachment&lt;/a&gt;
+&lt;a class="external" href="http://example.com/"&gt;normal link&lt;/a&gt;
 &lt;img class="img-responsive" src="/_file/attachments/image.png" alt="image" /&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/_file/literalinclude/linked.py"&gt;another node&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="attachment" href="/_file/literalinclude/linked.py"&gt;another node&lt;/a&gt;&lt;/p&gt;
 </content>
     <link href="https://example.com/attachments" rel="alternate"/>
     <published>2020-01-01T00:00:00+00:00</published>

@@ -24,12 +24,12 @@
       <name>local</name>
       <email>local@example.com</email>
     </author>
-    <content type="html">&lt;p&gt;&lt;a href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href=""&gt;label&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;a href=""&gt;one&lt;/a&gt;&lt;/p&gt;
+    <content type="html">&lt;p&gt;&lt;a class="internal" href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="internal" href="/two"&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="internal" href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="internal" href="/two"&gt;two&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="anchor" href=""&gt;label&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class="anchor" href=""&gt;one&lt;/a&gt;&lt;/p&gt;
 
 &lt;div&gt;
 snippet: test

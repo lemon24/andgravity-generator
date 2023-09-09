@@ -1,4 +1,5 @@
 <p><a href="http://example/one">1</a>
 <a href="ATTACHMENT:TWO">2</a>
+<a class="type" href="TYPE:TWO-POINT-ONE">2.1</a>
 <img class="img-responsive" src="http://example/three" alt="3" />
 <img class="img-responsive" src="ATTACHMENT:FOUR" alt="4" /></p>

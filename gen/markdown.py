@@ -187,18 +187,28 @@ class MyRenderer(mistune.HTMLRenderer):
     # BEGIN url rewriting mixin
 
     def _rewrite_url(self, url, text):
+        url_class = None
         for rewriter in self._url_rewriters:
             rv = rewriter(url, text)
             if rv:
-                url, text = rv
-        return url, text
+                if len(rv) not in (2, 3):
+                    raise RuntimeError(
+                        f"unexpected rewriter output: {rewriter!r}: {rv!r}"
+                    )
+                url, text, *_ = rv
+                if len(rv) > 2:
+                    url_class = rv[2]
+        return url, text, url_class
 
     def link(self, link, text=None, title=None):
-        link, text = self._rewrite_url(link, text)
-        return super().link(link, text, title)
+        link, text, url_class = self._rewrite_url(link, text)
+        rv = super().link(link, text, title)
+        if url_class:
+            rv = rv.replace('<a ', f'<a class="{url_class}" ')
+        return rv
 
     def image(self, src, alt="", title=None):
-        src, _ = self._rewrite_url(src, alt)
+        src, _, _ = self._rewrite_url(src, alt)
         rv = super().image(src, alt, title)
         rv = rv.replace('<img ', '<img class="img-responsive" ')
         return rv
