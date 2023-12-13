@@ -17,6 +17,13 @@ from slugify import slugify
 
 def do_highlight(code, lang, options=None):
     options = options or {}
+    return _do_highlight(code, lang, **options)
+
+
+@lru_cache
+def _do_highlight(code, lang, **options):
+    # This is an optimization for interactive use (`gen serve`),
+    # so a transient in-memory cache is fine.
     try:
         lexer = get_lexer_by_name(lang, **options)
     except ValueError:
@@ -94,10 +101,11 @@ def to_pygments_options(options, line_count):
         rv['linenos'] = options['linenos'].lower() not in FALSY_VALUES
 
     if 'emphasize-lines' in options:
-        rv['hl_lines'] = [
+        # tuple so it's hashable
+        rv['hl_lines'] = tuple(
             lineno + 1
             for lineno in parselinenos(options['emphasize-lines'], line_count)
-        ]
+        )
 
     if 'lineno-start' in options:
         rv['linenostart'] = int(options['lineno-start'])
