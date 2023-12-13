@@ -49,6 +49,29 @@ def serve(project, host, port, open):
 
 
 @cli.command()
+@click.argument('url')
+@click.option('-s', '--sort', default='cumulative')
+@click.option('--lines', type=int, default=40)
+@click.pass_obj
+@click.pass_context
+def profile(ctx, project, url, sort, lines):
+    from .app import create_app
+    import cProfile, pstats  # noqa: E401
+
+    app = create_app(project, project_url="http://localhost:8888")
+    client = ctx.with_resource(app.test_client())
+
+    stream = click.get_text_stream('stdout')
+
+    for i in range(2):
+        click.echo(f" RUN #{i} ".center(80, '=') + '\n')
+        pr = cProfile.Profile()
+        pr.runcall(client.get, url)
+        ps = pstats.Stats(pr, stream=stream)
+        ps.strip_dirs().sort_stats(sort).print_stats(lines)
+
+
+@cli.command()
 @click.argument(
     'outdir',
     type=click.Path(file_okay=False, resolve_path=True),
