@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 
 import mistune.directives
 from mistune import escape
@@ -8,8 +9,8 @@ from mistune.directives import Directive
 from pygments import highlight
 from pygments.formatters import get_formatter_by_name
 from pygments.lexers import get_lexer_by_name
-from pygments.lexers import get_lexer_for_filename
 from pygments.lexers import guess_lexer
+from pygments.lexers import guess_lexer_for_filename
 from pygments.util import ClassNotFound
 from slugify import slugify
 
@@ -314,16 +315,18 @@ class LiteralInclude(Directive):
 
             options.setdefault('lineno-start', only_lines[0] + 1)
 
+        file_text = ''.join(lines)
+
         if 'language' not in options:
             try:
-                options['language'] = get_lexer_for_filename(path).name
+                options['language'] = guess_language(path, file_text)
             except ClassNotFound:
                 pass
 
         if 'stripnl' not in options:
             options['stripnl'] = 'n'
 
-        return {'type': 'literalinclude', 'raw': ''.join(lines), 'params': (options,)}
+        return {'type': 'literalinclude', 'raw': file_text, 'params': (options,)}
 
     def __call__(self, md):
         self.register_directive(md, 'literalinclude')
@@ -331,6 +334,17 @@ class LiteralInclude(Directive):
             md.renderer.register('literalinclude', render_html_literalinclude)
         elif md.renderer.NAME == 'ast':
             raise NotImplementedError("no AST renderer for literalinclude")
+
+
+@lru_cache
+def guess_language(path, text):
+    # Guessing languages is unbearably slow for some reason.
+    # This is an optimization for interactive use (`gen serve`),
+    # so a transient in-memory cache is fine.
+    # `gen freeze` has less granular per-node caches,
+    # so caching this on disk may not help it that as much,
+    # but we can give it a try later on.
+    return guess_lexer_for_filename(path, text).name
 
 
 def render_html_literalinclude(text, options):
