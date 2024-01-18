@@ -244,7 +244,7 @@ def render_html_theading(text, level, tid):
     tag = 'h' + str(level)
 
     headerlink = (
-        '<span class="headerlink"> <a href="#'
+        '<span class="headerlink">&nbsp;<a href="#'
         + escape_url(tid)
         + '" title="permalink">#</a></span>'
     )
