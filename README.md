@@ -11,6 +11,7 @@ Features:
   * syntax highlighting (Pygments)
   * include highlighted code fragments from file (like Sphinx' literalinclude)
   * include templated snippets
+  * [Pikchr](https://pikchr.org/) diagrams
 * attachments
 * tags
 * Atom feeds (global, per-tag)
@@ -19,7 +20,7 @@ Features:
 * fast generation through aggressive caching
 * live preview
 
-Vaguely inspired by Lektor, but much less flexible, on purpose. Rougly following the ideas [here](https://github.com/lemon24/urlspace).
+Vaguely inspired by Lektor, but much less flexible, on purpose. Roughly following the ideas [here](https://github.com/lemon24/urlspace).
 
 Uses Flask to serve a web app, and Frozen-Flask to write the pages to disk.
 

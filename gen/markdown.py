@@ -385,6 +385,43 @@ class Snippet(Directive):
         self.register_directive(md, 'snippet')
 
 
+class Subprocess(Directive):
+    def __init__(self, name, args):
+        self.name = name
+        self.args = tuple(args)
+
+    def parse(self, block, m, state):
+        text = self.parse_text(m)
+
+        p = subprocess_run(self.args, text)
+        if p.returncode == 0:
+            return {'type': 'block_html', 'raw': p.stdout}
+        else:
+            import shlex
+
+            message = (
+                f'<code>{escape(shlex.join(self.args))}</code> exited'
+                f' with status <code>{p.returncode}</code>\n'
+            )
+            stdout = p.stdout.rstrip()
+            if stdout:
+                message += f'<pre>{escape(stdout)}</pre>\n'
+            stderr = p.stderr.rstrip()
+            if stderr:
+                message += f'<pre>{escape(stderr)}</pre>\n'
+            return {'type': 'block_error', 'raw': message}
+
+    def __call__(self, md):
+        self.register_directive(md, self.name)
+
+
+@lru_cache
+def subprocess_run(args, input):
+    import subprocess
+
+    return subprocess.run(args, input=input, capture_output=True, text=True)
+
+
 def make_markdown(url_rewriters, load_literalinclude, render_snippet):
     return mistune.create_markdown(
         renderer=MyRenderer(escape=False, url_rewriters=url_rewriters),
@@ -400,6 +437,7 @@ def make_markdown(url_rewriters, load_literalinclude, render_snippet):
             plugin_footnotes_fix,
             LiteralInclude(load_literalinclude),
             Snippet(render_snippet),
+            Subprocess('pikchr', ['pikchr', '--svg-only', '-']),
         ],
     )
 
