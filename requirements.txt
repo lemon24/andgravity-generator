@@ -1,11 +1,11 @@
 flask
 click
 frozen-flask
-mistune>=2
+mistune>=2,<3  # TODO: upgrade?
 python-slugify
 pyyaml
 pygments>=2.12
-feedgen
+feedgen<1  # TODO: upgrade?
 pytest
 pytest-subtests
 pre-commit
