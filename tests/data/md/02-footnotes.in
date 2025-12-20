@@ -5,3 +5,9 @@ one[^1]
 two[^word][^1]
 
 [^word]: t-w-o
+
+three[^bold]
+
+[^bold]: **bold** [link][ref]
+
+[ref]: url
