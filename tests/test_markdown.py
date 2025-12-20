@@ -1,4 +1,5 @@
 import os.path
+import subprocess
 from glob import glob
 from textwrap import dedent
 
@@ -27,6 +28,32 @@ def md_html(request):
         return mdf.read(), htmlf.read()
 
 
+ECHO_STDIN = """\
+#!/bin/bash
+echo "$@"
+cat
+"""
+
+
+@pytest.fixture()
+def pikchr(tmp_path, monkeypatch):
+    bin = tmp_path / "bin"
+    bin.mkdir()
+
+    pikchr = bin / "pikchr"
+    pikchr.write_text(ECHO_STDIN)
+    pikchr.chmod(0o700)
+
+    original_run = subprocess.run
+
+    def run(*args, **kwargs):
+        return original_run(
+            *args, env={'PATH': f"{bin}:{os.environ['PATH']}"}, **kwargs
+        )
+
+    monkeypatch.setattr(subprocess, 'run', run)
+
+
 def build_node_url(url, text):
     if url.startswith('node:'):
         return url.upper(), text or 'default'
@@ -49,7 +76,7 @@ def render_snippet(value, text, options):
     return f"snippet: {value}\noptions: {options}\ntext: {dedent(text)!r}"
 
 
-def test_parts(md_html):
+def test_parts(md_html, pikchr):
     md, expected = md_html
     actual = make_markdown(
         [build_node_url, build_file_url, build_type_url], load_lines, render_snippet
