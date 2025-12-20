@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from gen.cli import cli
 
+
 ROOT = Path(__file__).parent
 
 

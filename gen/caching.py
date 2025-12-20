@@ -11,6 +11,7 @@ import readtime
 from werkzeug.exceptions import NotFound
 
 import gen
+
 from .checks import LinkChecker
 from .checks import MetaChecker
 from .checks import RenderingChecker

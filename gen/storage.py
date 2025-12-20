@@ -2,6 +2,7 @@
 Data model stuff.
 
 """
+
 import os.path
 from dataclasses import dataclass
 from functools import cached_property

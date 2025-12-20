@@ -55,8 +55,10 @@ def serve(project, host, port, open):
 @click.pass_obj
 @click.pass_context
 def profile(ctx, project, url, sort, lines):
+    import cProfile
+    import pstats
+
     from .app import create_app
-    import cProfile, pstats  # noqa: E401
 
     app = create_app(project, project_url="http://localhost:8888")
     client = ctx.with_resource(app.test_client())
@@ -128,8 +130,10 @@ def freeze(ctx, project, outdir, force, deploy, cache_option, verbose):
     else:
         node_cache_decorator = functools.lru_cache
 
-    from .app import create_app, get_project_url
     from jinja2 import FileSystemBytecodeCache
+
+    from .app import create_app
+    from .app import get_project_url
 
     app = create_app(project, node_cache_decorator=node_cache_decorator)
 
