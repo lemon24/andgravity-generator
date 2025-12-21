@@ -477,35 +477,6 @@ def make_markdown(url_rewriters, load_literalinclude, render_snippet):
     )
 
 
-def md_footnotes_hook(md, result, state):
-    from mistune.core import BlockState
-    from mistune.plugins.footnotes import parse_footnote_item
-
-    notes = state.env.get("footnotes")
-    if not notes:
-        return result
-
-    children = [
-        parse_footnote_item(md.block, k, i + 1, state) for i, k in enumerate(notes)
-    ]
-    state = BlockState(parent=state)
-    state.tokens = [{"type": "footnotes", "children": children}]
-    output = md.render_state(state)
-    return result + output  # type: ignore[operator]
-
-
-# pending https://github.com/lepture/mistune/issues/378#issuecomment-3678197092
-mistune.plugins.footnotes.md_footnotes_hook = md_footnotes_hook
-# unreleased https://github.com/lepture/mistune/pull/423
-mistune.plugins.footnotes.REF_FOOTNOTE = (
-    r"^(?P<footnote_lead> {0,4})"
-    r"\[\^(?P<footnote_key>" + mistune.plugins.footnotes.LINK_LABEL + r")]:[ \t\n]"
-    r"(?P<footnote_text>[^\n]*(?:\n+|$)"
-    r"(?:(?P=footnote_lead) {1,4}(?! )[^\n]*\n+)*"
-    r")"
-)
-
-
 if __name__ == '__main__':
 
     with open('tests/data/md/09-literalinclude.in') as f:
