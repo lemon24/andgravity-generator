@@ -460,6 +460,7 @@ def make_markdown(url_rewriters, load_literalinclude, render_snippet):
             'table',
             'task_lists',
             'def_list',
+            'abbr',
             mistune.directives.RSTDirective(
                 [
                     mistune.directives.TableOfContents(),
