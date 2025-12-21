@@ -1,5 +1,6 @@
 <h2 id="one">one<span class="headerlink">&nbsp;<a href="#one" title="permalink">#</a></span></h2>
-<section class="toc">
+<details class="toc" open>
+<summary>Table of Contents</summary>
 <ul>
 <li><a href="#one">one</a>
 <ul>
@@ -8,6 +9,6 @@
 </ul>
 </li>
 </ul>
-</section>
+</details>
 <h3 id="two">two<span class="headerlink">&nbsp;<a href="#two" title="permalink">#</a></span></h3>
 <h3 id="two-1">two<span class="headerlink">&nbsp;<a href="#two-1" title="permalink">#</a></span></h3>

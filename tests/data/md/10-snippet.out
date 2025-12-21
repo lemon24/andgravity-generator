@@ -3,4 +3,4 @@ options: {'key': 'value'}
 text: '*text*\nmore text\n\n'
 snippet: two
 options: {}
-text: ''
+text: '\n'

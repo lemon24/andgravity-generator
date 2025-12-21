@@ -60,7 +60,10 @@ one:
   - /two#id-error: fragment not found
   - /inexistent-node: node not found
   markdown:
-  - 'Unsupported directive: unknown-directive'
+  - '.. unknown-directive::
+
+
+    '
   - 'could not render snippet ''unknown-snippet'': TemplateNotFound: snippets/unknown-snippet.html'
 """  # noqa
 

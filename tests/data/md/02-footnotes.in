@@ -11,3 +11,8 @@ three[^bold]
 [^bold]: **bold** [link][ref]
 
 [ref]: url
+
+four[^nofirstline]
+
+[^nofirstline]:
+  text

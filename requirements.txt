@@ -1,7 +1,7 @@
 flask
 click
 frozen-flask
-mistune>=2,<3  # TODO: upgrade?
+mistune==3.1.4
 python-slugify
 pyyaml
 pygments>=2.12

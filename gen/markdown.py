@@ -3,9 +3,9 @@ from functools import lru_cache
 
 import mistune.directives
 from mistune import escape
-from mistune import escape_html
 from mistune import escape_url
-from mistune.directives import Directive
+from mistune import safe_entity
+from mistune.directives import DirectivePlugin
 from pygments import highlight
 from pygments.formatters import get_formatter_by_name
 from pygments.lexers import get_lexer_by_name
@@ -153,7 +153,7 @@ def render_highlighed_code(code, options):
         html = html.replace('</pre>', '</code></pre>', 1)
 
     html = html.replace(
-        '<pre>', '<pre class="code" data-lang="' + escape_html(data_lang) + '">', 1
+        '<pre>', '<pre class="code" data-lang="' + safe_entity(data_lang) + '">', 1
     )
 
     # add .code-container to the outermost element
@@ -209,81 +209,108 @@ class MyRenderer(mistune.HTMLRenderer):
                     url_class = rv[2]
         return url, text, url_class
 
-    def link(self, link, text=None, title=None):
-        link, text, url_class = self._rewrite_url(link, text)
-        rv = super().link(link, text, title)
+    def link(self, text, url, title=None):
+        url, text, url_class = self._rewrite_url(url, text)
+        rv = super().link(text, url, title)
         if url_class:
             rv = rv.replace('<a ', f'<a class="{url_class}" ')
         return rv
 
-    def image(self, src, alt="", title=None):
-        src, _, _ = self._rewrite_url(src, alt)
-        rv = super().image(src, alt, title)
+    def image(self, text, url, title=None):
+        url, _, _ = self._rewrite_url(url, text)
+        rv = super().image(text, url, title)
         rv = rv.replace('<img ', '<img class="img-responsive" ')
         return rv
 
     # END url rewriting mixin
 
 
-def record_toc_heading(text, level, state):
-    existing_tids = set(t[0] for t in state['toc_headings'])
-    slug = slugify(text)
+def heading_slugs(md):
 
-    tid = slug
-    counter = 1
-    while tid in existing_tids:
-        tid = slug + '-' + str(counter)
-        counter += 1
+    def slugify_heading_ids(md, state):
+        seen = set()
+        old_to_new = {}
 
-    state['toc_headings'].append((tid, text, level))
-    return {'type': 'theading', 'text': text, 'params': (level, tid)}
+        for tok in state.tokens:
+            if tok['type'] != 'heading':
+                continue
+
+            slug = slugify(tok['text'])
+
+            id = slug
+            counter = 1
+            while id in seen:
+                id = f"{slug}-{counter}"
+                counter += 1
+
+            seen.add(id)
+            if old_id := tok['attrs'].get('id'):
+                old_to_new[old_id] = id
+            tok['attrs']['id'] = id
+
+        for tok in state.tokens:
+            if tok['type'] != 'toc':
+                continue
+
+            tok['attrs']['toc'] = [
+                (level, old_to_new.get(id, id), text)
+                for level, id, text in tok['attrs']['toc']
+            ]
+
+    md.before_render_hooks.append(slugify_heading_ids)
 
 
-def render_html_theading(text, level, tid):
-    level = level + 1
-    tag = 'h' + str(level)
+def heading_permalinks(md):
+    """Add permalink anchors after headings. Decrease heading level by one."""
 
-    headerlink = (
-        '<span class="headerlink">&nbsp;<a href="#'
-        + escape_url(tid)
-        + '" title="permalink">#</a></span>'
-    )
+    def change_heading_type(md, state):
+        # needed because you can't override built-in renderer methods
+        for tok in state.tokens:
+            if tok['type'] != 'heading':
+                continue
+            tok['type'] = 'theading'
 
-    return '<' + tag + ' id="' + tid + '">' + text + headerlink + '</' + tag + '>\n'
+    def render_theading(md, text, level, **attrs):
+        level = level + 1
+        tag = 'h' + str(level)
+        id = attrs['id']
+        headerlink = (
+            '<span class="headerlink">&nbsp;<a href="#'
+            + escape_url(id)
+            + '" title="permalink">#</a></span>'
+        )
+        return f'<{tag} id="{id}">{text}{headerlink}</{tag}>\n'
 
-
-def plugin_toc_fix(md):
-    md.block.tokenize_heading = record_toc_heading
     if md.renderer.NAME == 'html':
-        md.renderer.register('theading', render_html_theading)
+        md.before_render_hooks.append(change_heading_type)
+        md.renderer.register('theading', render_theading)
 
 
-def render_html_footnote_item(text, key, index):
-    i = str(index)
-    back = ' <a href="#fnref-' + i + '" class="footnote"><sup>[return]</sup></a>'
+def footnote_return(md):
 
-    text = text.rstrip()
-    if text.endswith('</p>'):
-        text = text[:-4] + back + '</p>'
-    else:
-        text = text + back
-    return '<li id="fn-' + i + '">' + text + '</li>\n'
+    def render_footnote_item(md, text, key, index):
+        i = str(index)
+        back = f' <a href="#fnref-{i}" class="footnote"><sup>[return]</sup></a>'
+        text = text.rstrip()
+        if text.endswith('</p>'):
+            text = text[:-4] + back + '</p>'
+        else:
+            text = text + back
+        return f'<li id="fn-{i}">{text}</li>\n'
 
-
-def plugin_footnotes_fix(md):
     if md.renderer.NAME == 'html':
-        md.renderer.register('footnote_item', render_html_footnote_item)
+        md.renderer.register('footnote_item', render_footnote_item)
 
 
-class LiteralInclude(Directive):
+class LiteralInclude(DirectivePlugin):
     def __init__(self, load_lines):
         self.load_lines = load_lines
 
     def parse(self, block, m, state):
         options = dict(self.parse_options(m))
 
-        path = m.group('value')
-        text = self.parse_text(m)
+        path = self.parse_title(m)
+        text = self.parse_content(m)
         # TODO handle
         assert not text.strip(), text
 
@@ -334,14 +361,16 @@ class LiteralInclude(Directive):
         if 'stripnl' not in options:
             options['stripnl'] = 'n'
 
-        return {'type': 'literalinclude', 'raw': file_text, 'params': (options,)}
+        return {
+            'type': 'literalinclude',
+            'raw': file_text,
+            'attrs': {'options': options},
+        }
 
-    def __call__(self, md):
-        self.register_directive(md, 'literalinclude')
+    def __call__(self, directive, md):
+        directive.register('literalinclude', self.parse)
         if md.renderer.NAME == 'html':
             md.renderer.register('literalinclude', render_html_literalinclude)
-        elif md.renderer.NAME == 'ast':
-            raise NotImplementedError("no AST renderer for literalinclude")
 
 
 @lru_cache
@@ -355,20 +384,20 @@ def guess_language(path, text):
     return guess_lexer_for_filename(path, text).name
 
 
-def render_html_literalinclude(text, options):
+def render_html_literalinclude(md, text, options):
     if 'language' not in options:
         return render_plain_code(text) + '\n'
     return render_highlighed_code(text, options) + '\n'
 
 
-class Snippet(Directive):
+class Snippet(DirectivePlugin):
     def __init__(self, render):
         self.render = render
 
     def parse(self, block, m, state):
         options = dict(self.parse_options(m))
-        value = m.group('value')
-        text = self.parse_text(m)
+        value = self.parse_title(m)
+        text = self.parse_content(m)
 
         # TODO: maybe extract some standard options
         try:
@@ -381,17 +410,17 @@ class Snippet(Directive):
 
         return {'type': 'block_html', 'raw': raw}
 
-    def __call__(self, md):
-        self.register_directive(md, 'snippet')
+    def __call__(self, directive, md):
+        directive.register('snippet', self.parse)
 
 
-class Subprocess(Directive):
+class Subprocess(DirectivePlugin):
     def __init__(self, name, args):
         self.name = name
         self.args = tuple(args)
 
     def parse(self, block, m, state):
-        text = self.parse_text(m)
+        text = self.parse_content(m)
 
         p = subprocess_run(self.args, text)
         if p.returncode == 0:
@@ -411,8 +440,8 @@ class Subprocess(Directive):
                 message += f'<pre>{escape(stderr)}</pre>\n'
             return {'type': 'block_error', 'raw': message}
 
-    def __call__(self, md):
-        self.register_directive(md, self.name)
+    def __call__(self, directive, md):
+        directive.register(self.name, self.parse)
 
 
 @lru_cache
@@ -431,15 +460,49 @@ def make_markdown(url_rewriters, load_literalinclude, render_snippet):
             'table',
             'task_lists',
             'def_list',
-            mistune.directives.DirectiveToc(),
-            mistune.directives.Admonition(),
-            plugin_toc_fix,
-            plugin_footnotes_fix,
-            LiteralInclude(load_literalinclude),
-            Snippet(render_snippet),
-            Subprocess('pikchr', ['pikchr', '--svg-only', '-']),
+            mistune.directives.RSTDirective(
+                [
+                    mistune.directives.TableOfContents(),
+                    mistune.directives.Admonition(),
+                    LiteralInclude(load_literalinclude),
+                    Snippet(render_snippet),
+                    Subprocess('pikchr', ['pikchr', '--svg-only', '-']),
+                ]
+            ),
+            heading_slugs,
+            heading_permalinks,
+            footnote_return,
         ],
     )
+
+
+def md_footnotes_hook(md, result, state):
+    from mistune.core import BlockState
+    from mistune.plugins.footnotes import parse_footnote_item
+
+    notes = state.env.get("footnotes")
+    if not notes:
+        return result
+
+    children = [
+        parse_footnote_item(md.block, k, i + 1, state) for i, k in enumerate(notes)
+    ]
+    state = BlockState(parent=state)
+    state.tokens = [{"type": "footnotes", "children": children}]
+    output = md.render_state(state)
+    return result + output  # type: ignore[operator]
+
+
+# pending https://github.com/lepture/mistune/issues/378#issuecomment-3678197092
+mistune.plugins.footnotes.md_footnotes_hook = md_footnotes_hook
+# unreleased https://github.com/lepture/mistune/pull/423
+mistune.plugins.footnotes.REF_FOOTNOTE = (
+    r"^(?P<footnote_lead> {0,4})"
+    r"\[\^(?P<footnote_key>" + mistune.plugins.footnotes.LINK_LABEL + r")]:[ \t\n]"
+    r"(?P<footnote_text>[^\n]*(?:\n+|$)"
+    r"(?:(?P=footnote_lead) {1,4}(?! )[^\n]*\n+)*"
+    r")"
+)
 
 
 if __name__ == '__main__':

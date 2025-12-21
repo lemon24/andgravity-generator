@@ -81,4 +81,5 @@ def test_parts(md_html, pikchr):
     actual = make_markdown(
         [build_node_url, build_file_url, build_type_url], load_lines, render_snippet
     )(md)
+    # print('===', actual.rstrip(), '---', expected.rstrip(), sep='\n')
     assert actual.rstrip() == expected.rstrip()
