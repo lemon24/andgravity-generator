@@ -1,0 +1,28 @@
+[project]
+name = "gen"
+version = "0.1.dev0"
+description = "A static site generator."
+requires-python = ">=3.14"
+dependencies = [
+    "flask",
+    "click",
+    "frozen-flask",
+    # mistune>3.1.4
+    "mistune @ https://github.com/lepture/mistune/archive/0eb6871.zip",
+    "python-slugify",
+    "pyyaml",
+    "pygments>=2.12",
+    # TODO: upgrade?
+    "feedgen<1",
+    "pytest",
+    "pytest-subtests",
+    "pre-commit",
+    "readtime",
+    "humanize",
+    "beautifulsoup4",
+    "diskcache",
+]
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
