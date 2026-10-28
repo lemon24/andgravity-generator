@@ -1,4 +1,5 @@
 import re
+import shlex
 from functools import lru_cache
 
 import mistune.directives
@@ -65,27 +66,26 @@ def parse_block_code_options(info: str) -> dict:
     """Parse a highlighting options string to Pygments HTML formatter option.
 
     The options are named after those of the Sphinx code-block directive.
-    Unlike Sphinx directives, they are space-separated "key(=value)" pairs.
+    Unlike Sphinx directives, they are space-separated "key(=value)" pairs;
+    to include spaces, use shell-style quoting.
 
     All options:
 
-        <lang> linenos emphasize-lines=2,4-6,8- lineno-start=10
+        <lexer name>  (must be the first option)
+        linenos
+        emphasize-lines=2,4-6,8-
+        lineno-start=10
+        caption="my title"
 
     Unknown options are ignored.
 
     """
-    lang, *rest = info.split(None, 1)
+    lang, *rest = shlex.split(info)
 
     options = {'language': lang}
 
-    rest = rest and rest[0]
-    if rest:
-        rest = rest.strip()
-    if not rest:
-        return options
-
-    for part in rest.split():
-        key, sep, value = part.partition('=')
+    for part in rest:
+        key, _, value = part.partition('=')
         options[key] = value
 
     return options
