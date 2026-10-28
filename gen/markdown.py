@@ -114,15 +114,8 @@ def to_pygments_options(options, line_count):
     if 'stripnl' in options:
         rv['stripnl'] = options['stripnl'].lower() not in FALSY_VALUES
 
-    # disable caption for now;
-    # we don't know how to parse quoted literals (so it must be a single word),
-    # and filename results in
-    #   <div class="highlight"><span class="filename">file.py</span>
-    # which is really hard to style
-    """
     if 'caption' in options:
         rv['filename'] = options.pop('caption')
-    """
 
     return rv
 
